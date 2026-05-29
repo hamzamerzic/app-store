@@ -13,6 +13,25 @@ const CATALOG = [
   },
 ]
 
+// Hosts we recognize as common public manifest sources. The paste-a-URL
+// flow silently trusts these; anything else triggers a soft warning in
+// the install confirm modal. This is UX-only — the backend's SSRF
+// defenses are the actual security boundary.
+const TRUSTED_HOSTS = new Set([
+  'raw.githubusercontent.com',
+  'codeberg.org',
+  'git.sr.ht',
+  'gitlab.com',
+])
+
+function isTrustedHost(url) {
+  try {
+    return TRUSTED_HOSTS.has(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
+
 const s = {
   root: {
     height: '100%', display: 'flex', flexDirection: 'column',
@@ -189,6 +208,24 @@ const s = {
     background: 'var(--accent-dim, rgba(139,108,247,0.15))',
     border: '1px solid var(--accent)', borderRadius: '8px',
     fontSize: '13px', lineHeight: 1.5,
+  },
+  hostWarn: {
+    display: 'flex', gap: '10px', alignItems: 'flex-start',
+    padding: '10px 12px', marginBottom: '12px',
+    background: 'var(--accent-dim, rgba(139,108,247,0.15))',
+    border: '1px solid var(--accent)', borderRadius: '8px',
+    fontSize: '13px', lineHeight: 1.5,
+  },
+  hostWarnIcon: {
+    fontSize: '16px', lineHeight: 1.2, color: 'var(--accent)',
+    flexShrink: 0,
+  },
+  hostWarnHost: {
+    fontWeight: 600, color: 'var(--text)',
+    fontFamily: 'var(--mono, monospace)',
+  },
+  hostWarnBody: {
+    color: 'var(--muted)', marginTop: '2px',
   },
   link: {
     color: 'var(--accent)', textDecoration: 'none',
@@ -418,11 +455,19 @@ async function installApp({ manifest_url, manifest, raw_base, token }) {
   }
 }
 
-function ConfirmModal({ manifest, raw_base, onConfirm, onCancel, busy, isUpdate }) {
+function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, busy, isUpdate }) {
   const ca = manifest.permissions?.cross_app_access || 'none'
   const sw = manifest.permissions?.share_with_apps || 'none'
   const hasSchedule = !!manifest.schedule
   const esmDeps = manifest.runtime?.esm_deps || []
+  // Soft warn for unfamiliar hosts (paste-a-URL flow). Catalog entries
+  // already resolve to trusted hosts, so they pass silently. Invalid
+  // URLs fall through to the warn path on purpose.
+  const unfamiliarHost = manifest_url && !isTrustedHost(manifest_url)
+  let warnHost = ''
+  if (unfamiliarHost) {
+    try { warnHost = new URL(manifest_url).hostname } catch { warnHost = manifest_url }
+  }
   return (
     <div style={s.modalBackdrop} onClick={busy ? null : onCancel}>
       <div style={s.modal} onClick={e => e.stopPropagation()}>
@@ -474,6 +519,19 @@ function ConfirmModal({ manifest, raw_base, onConfirm, onCancel, busy, isUpdate 
               </div>
             </div>
           </>
+        )}
+
+        {unfamiliarHost && (
+          <div style={{ ...s.hostWarn, marginTop: '16px', marginBottom: 0 }}>
+            <div style={s.hostWarnIcon} aria-hidden="true">⚠</div>
+            <div>
+              <div>Unfamiliar host: <span style={s.hostWarnHost}>{warnHost}</span></div>
+              <div style={s.hostWarnBody}>
+                You're installing from a host that isn't in the trusted list.
+                Continue only if you trust the author.
+              </div>
+            </div>
+          </div>
         )}
 
         <div style={s.modalActions}>
@@ -850,6 +908,7 @@ export default function App({ appId, token }) {
           <ConfirmModal
             manifest={pendingInstall.item.manifest}
             raw_base={pendingInstall.item.raw_base}
+            manifest_url={pendingInstall.item.manifest_url}
             onConfirm={confirmInstall}
             onCancel={() => !busy && setPendingInstall(null)}
             busy={busy}
@@ -902,6 +961,7 @@ export default function App({ appId, token }) {
         <ConfirmModal
           manifest={pendingInstall.item.manifest}
           raw_base={pendingInstall.item.raw_base}
+          manifest_url={pendingInstall.item.manifest_url}
           onConfirm={confirmInstall}
           onCancel={() => !busy && setPendingInstall(null)}
           busy={busy}
