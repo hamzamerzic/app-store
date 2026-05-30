@@ -455,7 +455,7 @@ async function installApp({ manifest_url, manifest, raw_base, token }) {
   }
 }
 
-function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, busy, isUpdate, slugConflict, conflictName }) {
+function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, busy, isUpdate }) {
   const ca = manifest.permissions?.cross_app_access || 'none'
   const sw = manifest.permissions?.share_with_apps || 'none'
   const hasSchedule = !!manifest.schedule
@@ -534,20 +534,6 @@ function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, b
           </div>
         )}
 
-        {slugConflict && (
-          <div style={{ ...s.hostWarn, marginTop: '16px', marginBottom: 0 }}>
-            <div style={s.hostWarnIcon} aria-hidden="true">⚠</div>
-            <div>
-              <div>Replaces existing app: <span style={s.hostWarnHost}>{conflictName}</span></div>
-              <div style={s.hostWarnBody}>
-                You have an app with the slug "{manifest.id}" that the App Store didn't install.
-                Continuing will OVERWRITE its JSX, permissions, and metadata. Your
-                storage data (notes, etc.) is preserved. This is not undoable.
-              </div>
-            </div>
-          </div>
-        )}
-
         <div style={s.modalActions}>
           <button style={{ ...s.dangerBtn, color: 'var(--text)' }}
                   onClick={onCancel} disabled={busy}>
@@ -583,24 +569,18 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
           )
         }
         const m = item.manifest
-        // Match by manifest.id → app.slug — name can be edited by the user
-        // and would silently divorce update detection from the catalog entry.
-        // BUT a bare slug match without a version record means the user has
-        // a same-slug app that the store didn't install — treat as conflict,
-        // not "installed". Otherwise installing would clobber their app.
-        const slugMatch = installed.find(a => a.slug === m.id)
-        const storeInstalled = !!slugMatch && !!installedVersions[item.id]
-        const slugConflict = !!slugMatch && !installedVersions[item.id]
-        const hasUpdate = storeInstalled && installedVersions[item.id]
-          && semverCmp(installedVersions[item.id], m.version) < 0
+        // Match by manifest_url — the URL the app was installed from.
+        // Slug is now pure routing (allocate_unique_slug on collision);
+        // identity lives on manifest_url. A user-built app and a store-
+        // installed app with the same slug coexist; the store can find
+        // its own apps regardless of slug bumps.
+        const storeInstalled = installed.find(a => a.manifest_url === item.manifest_url)
+        const installedVer = installedVersions[item.id]
+        const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
         let btnLabel = 'Install'
         let btnVariant = 'primary'
         if (storeInstalled && hasUpdate) { btnLabel = 'Update'; btnVariant = 'update' }
         else if (storeInstalled) { btnLabel = 'Open'; btnVariant = 'secondary' }
-        else if (slugConflict) {
-          btnLabel = `Replace ${slugMatch.name}`
-          btnVariant = 'warn'
-        }
         return (
           <div key={item.id} style={s.card} onClick={() => onPick(item)}>
             <IconBox item={item} />
@@ -674,13 +654,12 @@ function FromUrlTab({ onPreview }) {
 
 function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall }) {
   const m = item.manifest
-  // Match by manifest.id → app.slug, but require a version record proving
-  // the store installed it (see CatalogList comment). A bare slug match
-  // without a version record is a conflict, not "installed".
-  const slugMatch = installed.find(a => a.slug === m.id)
+  // Match by manifest_url — see CatalogList comment. Slug collisions
+  // between user apps and store apps are resolved transparently by
+  // allocate_unique_slug on the backend; the store reads its own
+  // installed apps via manifest_url, never slug.
+  const storeInstalled = installed.find(a => a.manifest_url === item.manifest_url)
   const installedVer = installedVersions[item.id]
-  const storeInstalled = !!slugMatch && !!installedVer
-  const slugConflict = !!slugMatch && !installedVer
   const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
   const ca = m.permissions?.cross_app_access || 'none'
   const sw = m.permissions?.share_with_apps || 'none'
@@ -750,27 +729,11 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
           </div>
         )}
 
-        {slugConflict && (
-          <div style={s.detailSection}>
-            <div style={s.sectionLabel}>Conflict</div>
-            <div style={s.hostWarn}>
-              <div style={s.hostWarnIcon} aria-hidden="true">⚠</div>
-              <div>
-                <div>Replaces existing app: <span style={s.hostWarnHost}>{slugMatch.name}</span></div>
-                <div style={s.hostWarnBody}>
-                  You have an app with slug "{m.id}" that the App Store didn't install.
-                  Installing here will OVERWRITE its JSX, permissions, and metadata.
-                  Storage data (notes, etc.) is preserved. This is not undoable.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div style={s.detailFooter}>
         {storeInstalled && !hasUpdate && (
-          <button style={s.dangerBtn} onClick={() => onUninstall(slugMatch)}>
+          <button style={s.dangerBtn} onClick={() => onUninstall(storeInstalled)}>
             Uninstall
           </button>
         )}
@@ -785,13 +748,12 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
           }}
           disabled={storeInstalled && !hasUpdate}
           onClick={() => {
-            if (hasUpdate) onInstall(item, { isUpdate: true, existingId: slugMatch.id })
-            else if (!storeInstalled) onInstall(item, { isUpdate: false, slugConflict, conflictName: slugMatch?.name })
+            if (hasUpdate) onInstall(item, { isUpdate: true, existingId: storeInstalled.id })
+            else if (!storeInstalled) onInstall(item, { isUpdate: false })
           }}
         >
           {hasUpdate ? 'Update to v' + m.version
             : storeInstalled ? 'Already installed'
-            : slugConflict ? `Replace ${slugMatch.name}`
             : 'Install'}
         </button>
       </div>
@@ -948,8 +910,6 @@ export default function App({ appId, token }) {
             onCancel={() => !busy && setPendingInstall(null)}
             busy={busy}
             isUpdate={pendingInstall.isUpdate}
-            slugConflict={pendingInstall.slugConflict}
-            conflictName={pendingInstall.conflictName}
           />
         )}
         {toast && (
