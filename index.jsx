@@ -382,6 +382,22 @@ async function saveInstalledVersions(appId, token, map) {
   })
 }
 
+// Ask the shell to switch to the installed app via the
+// `moebius:open-app` postMessage protocol (see Shell.jsx's handler).
+// `id` is the numeric DB id from /api/apps/. If we're not embedded in
+// the shell (mini-app run standalone), we can't navigate the parent
+// shell — surface a hint via the caller's toast.
+function openInstalledApp(id, onUnembedded) {
+  if (window.parent === window) {
+    if (onUnembedded) onUnembedded()
+    return
+  }
+  window.parent.postMessage(
+    { type: 'moebius:open-app', appId: id },
+    window.location.origin,
+  )
+}
+
 // GET /api/apps/ returns the full app list. We use slug + name to
 // find which catalog entries are already installed.
 async function loadInstalledApps(token) {
@@ -574,7 +590,7 @@ function UninstallConfirmModal({ app, busy, onConfirm, onCancel }) {
   )
 }
 
-function CatalogList({ items, installed, installedVersions, onPick }) {
+function CatalogList({ items, installed, installedVersions, onPick, onOpenInstalled }) {
   if (items.length === 0) {
     return <div style={s.empty}>No apps in the catalog yet.</div>
   }
@@ -607,6 +623,16 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
         let btnVariant = 'primary'
         if (storeInstalled && hasUpdate) { btnLabel = 'Update'; btnVariant = 'update' }
         else if (storeInstalled) { btnLabel = 'Open'; btnVariant = 'secondary' }
+        // "Open" on an already-installed card should actually open the
+        // app via the shell's moebius:open-app protocol — the previous
+        // behavior dropped the user on the Detail view's dead-end
+        // "Already installed" panel. Install / Update still route to
+        // the confirmation flow via onPick.
+        const handleBtnClick = (e) => {
+          e.stopPropagation()
+          if (storeInstalled && !hasUpdate) onOpenInstalled(storeInstalled.id)
+          else onPick(item)
+        }
         return (
           <div key={item.id} style={s.card} onClick={() => onPick(item)}>
             <IconBox item={item} />
@@ -614,7 +640,7 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
             <div style={s.cardVersion}>v{m.version}</div>
             <button
               style={s.cardBtn(btnVariant)}
-              onClick={e => { e.stopPropagation(); onPick(item) }}
+              onClick={handleBtnClick}
             >
               {btnLabel}
             </button>
@@ -678,7 +704,7 @@ function FromUrlTab({ onPreview }) {
   )
 }
 
-function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall }) {
+function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall, onOpenInstalled }) {
   const m = item.manifest
   // Match by manifest_url — see CatalogList comment. Slug collisions
   // between user apps and store apps are resolved transparently by
@@ -750,7 +776,6 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
             <div style={s.sectionLabel}>Installed</div>
             <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
               Currently installed: v{installedVer || 'unknown'}.
-              Open this app from the Möbius drawer.
             </div>
           </div>
         )}
@@ -763,23 +788,26 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
             Uninstall
           </button>
         )}
+        {/* Three footer button states:
+            - installed (no update): "Open App" → moebius:open-app via onOpenInstalled
+            - installed + update available: "Update to vX" → onInstall(isUpdate)
+            - not installed: "Install" → onInstall(isUpdate=false)
+            The disabled "Already installed" pill is gone — it was a
+            dead-end and the whole point of this view is that the user
+            can act on the app. */}
         <button
           style={{
             ...s.bigBtn,
-            background: hasUpdate ? 'var(--green)'
-                      : storeInstalled ? 'var(--surface2)'
-                      : 'var(--accent)',
-            color: storeInstalled && !hasUpdate ? 'var(--muted)' : '#fff',
-            cursor: storeInstalled && !hasUpdate ? 'default' : 'pointer',
+            background: hasUpdate ? 'var(--green)' : 'var(--accent)',
           }}
-          disabled={storeInstalled && !hasUpdate}
           onClick={() => {
             if (hasUpdate) onInstall(item, { isUpdate: true, existingId: storeInstalled.id })
-            else if (!storeInstalled) onInstall(item, { isUpdate: false })
+            else if (storeInstalled) onOpenInstalled(storeInstalled.id)
+            else onInstall(item, { isUpdate: false })
           }}
         >
           {hasUpdate ? 'Update to v' + m.version
-            : storeInstalled ? 'Already installed'
+            : storeInstalled ? 'Open App'
             : 'Install'}
         </button>
       </div>
@@ -840,6 +868,18 @@ export default function App({ appId, token }) {
     const apps = await loadInstalledApps(token)
     setInstalled(apps)
   }, [token])
+
+  // Wire the moebius:open-app postMessage with a toast fallback for
+  // the (defensive) standalone case. The shell handler validates the
+  // appId before navigating; we don't need an ack here.
+  const handleOpenInstalled = useCallback((id) => {
+    openInstalledApp(id, () => {
+      setToast({
+        kind: 'error',
+        message: 'Open this app from the drawer.',
+      })
+    })
+  }, [])
 
   const handleInstall = async (item, opts = {}) => {
     setPendingInstall({ item, ...opts })
@@ -945,6 +985,7 @@ export default function App({ appId, token }) {
           onBack={() => setDetail(null)}
           onInstall={handleInstall}
           onUninstall={handleUninstall}
+          onOpenInstalled={handleOpenInstalled}
         />
         {pendingInstall && (
           <ConfirmModal
@@ -1000,6 +1041,7 @@ export default function App({ appId, token }) {
                 installed={installed}
                 installedVersions={installedVersions}
                 onPick={(item) => item.manifest && setDetail(item)}
+                onOpenInstalled={handleOpenInstalled}
               />
         )}
         {tab === 'url' && (
