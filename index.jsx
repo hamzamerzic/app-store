@@ -66,54 +66,53 @@ const s = {
   scroll: {
     flex: 1, overflow: 'auto', padding: '16px',
   },
+  catalogGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+    gap: '14px',
+  },
   card: {
-    display: 'flex', alignItems: 'center', gap: '12px',
-    padding: '14px', background: 'var(--surface)',
-    border: '1px solid var(--border)', borderRadius: '8px',
-    marginBottom: '10px', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', textAlign: 'center',
+    padding: '14px 10px', background: 'var(--surface)',
+    border: '1px solid var(--border)', borderRadius: '12px',
+    cursor: 'pointer',
     transition: 'border-color 0.15s, transform 0.1s',
   },
   iconWrap: {
-    width: '48px', height: '48px', borderRadius: '10px',
-    background: 'var(--surface2)', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0, overflow: 'hidden',
+    width: '88px', height: '88px', borderRadius: '20px',
+    background: 'var(--surface2)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    marginBottom: '10px', flexShrink: 0, overflow: 'hidden',
   },
   iconImg: { width: '100%', height: '100%', objectFit: 'cover' },
   iconLetter: {
-    fontSize: '22px', fontWeight: 700, color: 'var(--accent)',
+    fontSize: '34px', fontWeight: 700, color: 'var(--accent)',
   },
-  cardBody: { flex: 1, minWidth: 0 },
   cardName: {
-    fontSize: '15px', fontWeight: 600, marginBottom: '2px',
-    display: 'flex', alignItems: 'center', gap: '8px',
-  },
-  cardVersion: {
-    fontSize: '11px', color: 'var(--muted)',
-    fontWeight: 400, fontFamily: 'var(--mono, monospace)',
-  },
-  cardDesc: {
-    fontSize: '13px', color: 'var(--muted)', lineHeight: 1.4,
+    fontSize: '14px', fontWeight: 600, lineHeight: 1.25,
+    marginBottom: '4px',
     display: '-webkit-box', WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
   },
+  cardVersion: {
+    fontSize: '11px', color: 'var(--muted)',
+    fontFamily: 'var(--mono, monospace)',
+    marginBottom: '8px',
+  },
   cardBtn: (variant) => ({
-    padding: '8px 16px', borderRadius: '10px',
+    width: '100%',
+    padding: '8px 12px', borderRadius: '8px',
     border: variant === 'secondary' ? '1px solid var(--border)' : 'none',
     background: variant === 'update' ? 'var(--green)'
               : variant === 'secondary' ? 'transparent'
+              : variant === 'warn' ? 'var(--accent)'
               : 'var(--accent)',
     color: variant === 'secondary' ? 'var(--text)' : '#fff',
     fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-    flexShrink: 0, fontFamily: 'var(--font)',
+    fontFamily: 'var(--font)',
     transition: 'background 0.15s',
   }),
-  updateBadge: {
-    display: 'inline-block', padding: '2px 6px',
-    borderRadius: '4px', background: 'var(--green)',
-    color: '#fff', fontSize: '10px', fontWeight: 600,
-    textTransform: 'uppercase', letterSpacing: '0.04em',
-  },
   // From URL tab
   urlForm: {
     background: 'var(--surface)', border: '1px solid var(--border)',
@@ -344,7 +343,8 @@ function IconBox({ item, size = 'normal' }) {
   if (url && !errored) {
     return (
       <div style={wrapStyle}>
-        <img src={url} alt="" style={s.iconImg} onError={() => setErrored(true)} />
+        <img src={url} alt="" style={s.iconImg} loading="lazy"
+             onError={() => setErrored(true)} />
       </div>
     )
   }
@@ -455,7 +455,7 @@ async function installApp({ manifest_url, manifest, raw_base, token }) {
   }
 }
 
-function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, busy, isUpdate }) {
+function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, busy, isUpdate, slugConflict, conflictName }) {
   const ca = manifest.permissions?.cross_app_access || 'none'
   const sw = manifest.permissions?.share_with_apps || 'none'
   const hasSchedule = !!manifest.schedule
@@ -534,6 +534,20 @@ function ConfirmModal({ manifest, raw_base, manifest_url, onConfirm, onCancel, b
           </div>
         )}
 
+        {slugConflict && (
+          <div style={{ ...s.hostWarn, marginTop: '16px', marginBottom: 0 }}>
+            <div style={s.hostWarnIcon} aria-hidden="true">⚠</div>
+            <div>
+              <div>Replaces existing app: <span style={s.hostWarnHost}>{conflictName}</span></div>
+              <div style={s.hostWarnBody}>
+                You have an app with the slug "{manifest.id}" that the App Store didn't install.
+                Continuing will OVERWRITE its JSX, permissions, and metadata. Your
+                storage data (notes, etc.) is preserved. This is not undoable.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={s.modalActions}>
           <button style={{ ...s.dangerBtn, color: 'var(--text)' }}
                   onClick={onCancel} disabled={busy}>
@@ -553,7 +567,7 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
     return <div style={s.empty}>No apps in the catalog yet.</div>
   }
   return (
-    <div>
+    <div style={s.catalogGrid}>
       {items.map(item => {
         if (!item.manifest) {
           return (
@@ -561,11 +575,9 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
               <div style={s.iconWrap}>
                 <span style={s.iconLetter}>{item.id.charAt(0).toUpperCase()}</span>
               </div>
-              <div style={s.cardBody}>
-                <div style={s.cardName}>{item.id}</div>
-                <div style={s.cardDesc}>
-                  {item.error ? `Couldn't fetch manifest: ${item.error}` : 'Loading…'}
-                </div>
+              <div style={s.cardName}>{item.id}</div>
+              <div style={s.cardVersion}>
+                {item.error ? 'fetch failed' : 'loading…'}
               </div>
             </div>
           )
@@ -573,25 +585,27 @@ function CatalogList({ items, installed, installedVersions, onPick }) {
         const m = item.manifest
         // Match by manifest.id → app.slug — name can be edited by the user
         // and would silently divorce update detection from the catalog entry.
-        const installedApp = installed.find(a => a.slug === m.id)
-        const installedVer = installedVersions[item.id]
-        const hasUpdate = installedApp && installedVer && semverCmp(installedVer, m.version) < 0
-        const isInstalled = !!installedApp
+        // BUT a bare slug match without a version record means the user has
+        // a same-slug app that the store didn't install — treat as conflict,
+        // not "installed". Otherwise installing would clobber their app.
+        const slugMatch = installed.find(a => a.slug === m.id)
+        const storeInstalled = !!slugMatch && !!installedVersions[item.id]
+        const slugConflict = !!slugMatch && !installedVersions[item.id]
+        const hasUpdate = storeInstalled && installedVersions[item.id]
+          && semverCmp(installedVersions[item.id], m.version) < 0
         let btnLabel = 'Install'
         let btnVariant = 'primary'
-        if (hasUpdate) { btnLabel = 'Update'; btnVariant = 'update' }
-        else if (isInstalled) { btnLabel = 'Open'; btnVariant = 'secondary' }
+        if (storeInstalled && hasUpdate) { btnLabel = 'Update'; btnVariant = 'update' }
+        else if (storeInstalled) { btnLabel = 'Open'; btnVariant = 'secondary' }
+        else if (slugConflict) {
+          btnLabel = `Replace ${slugMatch.name}`
+          btnVariant = 'warn'
+        }
         return (
           <div key={item.id} style={s.card} onClick={() => onPick(item)}>
             <IconBox item={item} />
-            <div style={s.cardBody}>
-              <div style={s.cardName}>
-                {m.name}
-                <span style={s.cardVersion}>v{m.version}</span>
-                {hasUpdate && <span style={s.updateBadge}>Update</span>}
-              </div>
-              <div style={s.cardDesc}>{m.description}</div>
-            </div>
+            <div style={s.cardName}>{m.name}</div>
+            <div style={s.cardVersion}>v{m.version}</div>
             <button
               style={s.cardBtn(btnVariant)}
               onClick={e => { e.stopPropagation(); onPick(item) }}
@@ -660,11 +674,14 @@ function FromUrlTab({ onPreview }) {
 
 function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall }) {
   const m = item.manifest
-  // Match by manifest.id → app.slug (see comment in BrowseView).
-  const installedApp = installed.find(a => a.slug === m.id)
+  // Match by manifest.id → app.slug, but require a version record proving
+  // the store installed it (see CatalogList comment). A bare slug match
+  // without a version record is a conflict, not "installed".
+  const slugMatch = installed.find(a => a.slug === m.id)
   const installedVer = installedVersions[item.id]
-  const hasUpdate = installedApp && installedVer && semverCmp(installedVer, m.version) < 0
-  const isInstalled = !!installedApp
+  const storeInstalled = !!slugMatch && !!installedVer
+  const slugConflict = !!slugMatch && !installedVer
+  const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
   const ca = m.permissions?.cross_app_access || 'none'
   const sw = m.permissions?.share_with_apps || 'none'
 
@@ -723,7 +740,7 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
           </div>
         )}
 
-        {isInstalled && (
+        {storeInstalled && (
           <div style={s.detailSection}>
             <div style={s.sectionLabel}>Installed</div>
             <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
@@ -732,11 +749,28 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
             </div>
           </div>
         )}
+
+        {slugConflict && (
+          <div style={s.detailSection}>
+            <div style={s.sectionLabel}>Conflict</div>
+            <div style={s.hostWarn}>
+              <div style={s.hostWarnIcon} aria-hidden="true">⚠</div>
+              <div>
+                <div>Replaces existing app: <span style={s.hostWarnHost}>{slugMatch.name}</span></div>
+                <div style={s.hostWarnBody}>
+                  You have an app with slug "{m.id}" that the App Store didn't install.
+                  Installing here will OVERWRITE its JSX, permissions, and metadata.
+                  Storage data (notes, etc.) is preserved. This is not undoable.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={s.detailFooter}>
-        {isInstalled && !hasUpdate && (
-          <button style={s.dangerBtn} onClick={() => onUninstall(installedApp)}>
+        {storeInstalled && !hasUpdate && (
+          <button style={s.dangerBtn} onClick={() => onUninstall(slugMatch)}>
             Uninstall
           </button>
         )}
@@ -744,19 +778,20 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
           style={{
             ...s.bigBtn,
             background: hasUpdate ? 'var(--green)'
-                      : isInstalled ? 'var(--surface2)'
+                      : storeInstalled ? 'var(--surface2)'
                       : 'var(--accent)',
-            color: isInstalled && !hasUpdate ? 'var(--muted)' : '#fff',
-            cursor: isInstalled && !hasUpdate ? 'default' : 'pointer',
+            color: storeInstalled && !hasUpdate ? 'var(--muted)' : '#fff',
+            cursor: storeInstalled && !hasUpdate ? 'default' : 'pointer',
           }}
-          disabled={isInstalled && !hasUpdate}
+          disabled={storeInstalled && !hasUpdate}
           onClick={() => {
-            if (hasUpdate) onInstall(item, { isUpdate: true, existingId: installedApp.id })
-            else if (!isInstalled) onInstall(item, { isUpdate: false })
+            if (hasUpdate) onInstall(item, { isUpdate: true, existingId: slugMatch.id })
+            else if (!storeInstalled) onInstall(item, { isUpdate: false, slugConflict, conflictName: slugMatch?.name })
           }}
         >
           {hasUpdate ? 'Update to v' + m.version
-            : isInstalled ? 'Already installed'
+            : storeInstalled ? 'Already installed'
+            : slugConflict ? `Replace ${slugMatch.name}`
             : 'Install'}
         </button>
       </div>
@@ -913,6 +948,8 @@ export default function App({ appId, token }) {
             onCancel={() => !busy && setPendingInstall(null)}
             busy={busy}
             isUpdate={pendingInstall.isUpdate}
+            slugConflict={pendingInstall.slugConflict}
+            conflictName={pendingInstall.conflictName}
           />
         )}
         {toast && (
