@@ -257,7 +257,7 @@ const s = {
   // From URL tab
   urlForm: {
     background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: '8px', padding: '16px',
+    borderRadius: '12px', padding: '16px',
   },
   urlLabel: {
     fontSize: '13px', fontWeight: 600, marginBottom: '8px',
@@ -268,18 +268,48 @@ const s = {
     lineHeight: 1.5,
   },
   urlInput: {
-    width: '100%', padding: '10px 12px',
+    width: '100%', padding: '12px',
     background: 'var(--bg)', color: 'var(--text)',
     border: '1px solid var(--border)', borderRadius: '8px',
     fontSize: '13px', fontFamily: 'var(--mono, monospace)',
     outline: 'none', boxSizing: 'border-box',
     marginBottom: '12px',
+    minHeight: '44px',
+    transition: 'border-color 150ms, box-shadow 150ms',
   },
   primaryBtn: {
-    padding: '10px 20px', borderRadius: '10px', border: 'none',
+    padding: '12px 20px', borderRadius: '10px', border: 'none',
     background: 'var(--accent)', color: '#fff',
     fontSize: '14px', fontWeight: 600, cursor: 'pointer',
     fontFamily: 'var(--font)',
+    minHeight: '44px',
+    transition: 'background 150ms',
+  },
+  // Live host indicator below the URL input — switches between
+  // "trusted source" (calm accent badge) and "unfamiliar host"
+  // (amber-toned, but not red — installing from a personal repo is
+  // legitimate; the framing should inform, not alarm).
+  hostBadge: (kind) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '4px 10px', borderRadius: '999px',
+    fontSize: '12px', fontWeight: 500,
+    fontFamily: 'var(--font)',
+    background: kind === 'trusted'
+      ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+      : 'color-mix(in srgb, var(--text) 6%, transparent)',
+    color: kind === 'trusted' ? 'var(--accent)' : 'var(--muted)',
+    border: '1px solid',
+    borderColor: kind === 'trusted' ? 'var(--accent)' : 'var(--border)',
+    marginBottom: '12px',
+  }),
+  hostBadgeDot: (kind) => ({
+    width: '6px', height: '6px', borderRadius: '999px',
+    background: kind === 'trusted' ? 'var(--accent)'
+              : 'color-mix(in srgb, var(--muted) 60%, transparent)',
+    flexShrink: 0,
+  }),
+  hostBadgeHost: {
+    fontFamily: 'var(--mono, monospace)', fontSize: '11px',
   },
   errorBox: {
     background: 'var(--accent-dim, rgba(255,80,80,0.1))',
@@ -1031,10 +1061,30 @@ function CatalogSkeleton({ count = 5 }) {
   )
 }
 
+// Pull a hostname out of a possibly-incomplete URL string. Returns ''
+// for blank or unparseable input so the live badge can simply skip
+// rendering instead of throwing.
+function hostnameOf(raw) {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  try { return new URL(trimmed).hostname } catch { return '' }
+}
+
 function FromUrlTab({ onPreview }) {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [focused, setFocused] = useState(false)
+
+  const host = hostnameOf(url)
+  // Three live states for the badge: nothing typed yet (suppress),
+  // trusted host (calm accent badge), unfamiliar host (muted badge).
+  // Trusted does NOT mean "safe" — it just means "we recognize this
+  // hosting service." The detail-page preview is where the actual
+  // contents get reviewed before commit.
+  let hostKind = null
+  if (host) hostKind = TRUSTED_HOSTS.has(host) ? 'trusted' : 'unfamiliar'
 
   const handlePreview = async () => {
     const trimmed = url.trim()
@@ -1060,22 +1110,46 @@ function FromUrlTab({ onPreview }) {
     }
   }
 
+  // Focus ring without :focus pseudo (inline styles can't express it).
+  // Same accent ring the catalog cards use, so the visual language is
+  // consistent across tabs.
+  const inputStyle = {
+    ...s.urlInput,
+    ...(focused ? {
+      borderColor: 'var(--accent)',
+      boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent)',
+    } : null),
+  }
+
   return (
     <div style={s.urlForm}>
-      <label style={s.urlLabel}>Manifest URL</label>
+      <label style={s.urlLabel} htmlFor="app-store-manifest-url">Manifest URL</label>
       <div style={s.urlHint}>
-        Paste a public URL to a <code>mobius.json</code> file (typically a
-        raw.githubusercontent.com link). The store will fetch the manifest,
-        show you what the app declares, and let you install.
+        Paste a public link to a <code>mobius.json</code> file. The store
+        will fetch the manifest, show you what it declares, and let you
+        review before installing.
       </div>
       <input
+        id="app-store-manifest-url"
         type="url"
         value={url}
         onChange={e => setUrl(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder="https://raw.githubusercontent.com/owner/app-foo/main/mobius.json"
-        style={s.urlInput}
+        style={inputStyle}
         onKeyDown={e => e.key === 'Enter' && handlePreview()}
       />
+      {hostKind && (
+        <div style={s.hostBadge(hostKind)}>
+          <span style={s.hostBadgeDot(hostKind)} aria-hidden="true" />
+          {hostKind === 'trusted' ? (
+            <>Recognized source · <span style={s.hostBadgeHost}>{host}</span></>
+          ) : (
+            <>Unfamiliar host · <span style={s.hostBadgeHost}>{host}</span></>
+          )}
+        </div>
+      )}
       <button style={s.primaryBtn} onClick={handlePreview} disabled={busy || !url.trim()}>
         {busy ? 'Loading…' : 'Preview'}
       </button>
