@@ -1217,6 +1217,11 @@ export default function App({ appId, token }) {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState(null)
   const [loadingCatalog, setLoadingCatalog] = useState(true)
+  // Guard against overlapping refreshes when several visibility/focus
+  // events fire in quick succession (e.g. drawer-close + tab-focus on
+  // mobile fire visibilitychange and focus a frame apart). A simple
+  // boolean is enough — we only care that one refresh is in flight.
+  const refreshingRef = useRef(false)
 
   // Initial fetch: catalog manifests + installed apps + version map.
   useEffect(() => {
@@ -1249,9 +1254,38 @@ export default function App({ appId, token }) {
   }, [appId, token])
 
   const refreshInstalled = useCallback(async () => {
-    const apps = await loadInstalledApps(token)
-    setInstalled(apps)
+    if (refreshingRef.current) return
+    refreshingRef.current = true
+    try {
+      const apps = await loadInstalledApps(token)
+      setInstalled(apps)
+    } finally {
+      refreshingRef.current = false
+    }
   }, [token])
+
+  // The drawer-delete path lives in the shell, not here — when the user
+  // uninstalls from the drawer and navigates back, our `installed`
+  // state still shows the deleted row as "Installed" until something
+  // re-fetches /api/apps/. Subscribe to the same trio of events the
+  // storage shim already uses to drain its outbox: visibilitychange +
+  // focus + pageshow. Polling would be wasteful — these three cover
+  // every realistic path back into a foregrounded App Store iframe
+  // (drawer dismiss, tab refocus, mobile bfcache restore).
+  useEffect(() => {
+    function maybeRefresh() {
+      if (document.visibilityState !== 'visible') return
+      refreshInstalled()
+    }
+    document.addEventListener('visibilitychange', maybeRefresh)
+    window.addEventListener('focus', maybeRefresh)
+    window.addEventListener('pageshow', maybeRefresh)
+    return () => {
+      document.removeEventListener('visibilitychange', maybeRefresh)
+      window.removeEventListener('focus', maybeRefresh)
+      window.removeEventListener('pageshow', maybeRefresh)
+    }
+  }, [refreshInstalled])
 
   // Re-fetch a single catalog manifest. Wired into CatalogCard's
   // "Try again" affordance — replaces the previous behavior where a
