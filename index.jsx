@@ -132,6 +132,27 @@ const s = {
     textAlign: 'center',
     minHeight: '48px',
   },
+  // Grid-card status pill — readonly. The card itself takes the tap
+  // to the detail view; the detail view owns the Install / Update /
+  // Open action button so the user sees permissions before committing.
+  cardStatus: (variant) => ({
+    fontSize: '11px', fontWeight: 600,
+    padding: '4px 10px', borderRadius: '999px',
+    fontFamily: 'var(--font)', letterSpacing: '0.01em',
+    border: '1px solid',
+    background: variant === 'update'
+      ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+      : variant === 'installed'
+      ? 'color-mix(in srgb, var(--text) 6%, transparent)'
+      : 'transparent',
+    color: variant === 'update' ? 'var(--accent)'
+         : variant === 'installed' ? 'var(--text)'
+         : 'var(--muted)',
+    borderColor: variant === 'update' ? 'var(--accent)'
+               : variant === 'installed' ? 'var(--border)'
+               : 'var(--border)',
+  }),
+  // kept for the detail view's primary/secondary buttons
   cardBtn: (variant) => ({
     width: '100%',
     padding: '8px 12px', borderRadius: '8px',
@@ -651,34 +672,35 @@ function CatalogList({ items, installed, installedVersions, onPick, onOpenInstal
         const storeInstalled = installed.find(a => a.manifest_url === item.manifest_url)
         const installedVer = installedVersions[item.id]
         const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
-        let btnLabel = 'Install'
-        let btnVariant = 'primary'
-        if (storeInstalled && hasUpdate) { btnLabel = 'Update'; btnVariant = 'update' }
-        else if (storeInstalled) { btnLabel = 'Open'; btnVariant = 'secondary' }
-        // "Open" on an already-installed card should actually open the
-        // app via the shell's moebius:open-app protocol — the previous
-        // behavior dropped the user on the Detail view's dead-end
-        // "Already installed" panel. Install / Update still route to
-        // the confirmation flow via onPick.
-        const handleBtnClick = (e) => {
-          e.stopPropagation()
-          if (storeInstalled && !hasUpdate) onOpenInstalled(storeInstalled.id)
-          else onPick(item)
-        }
+        // Status pill instead of an action button. The card itself
+        // takes the tap to the detail view; the detail view's Install
+        // / Update / Open button is the actual action. The earlier
+        // grid-level button was a labelled-trap: "Install" only opened
+        // the detail page, never installed directly — so the click
+        // didn't do what the label said.
+        let statusLabel = 'Not installed'
+        let statusVariant = 'available'
+        if (storeInstalled && hasUpdate) { statusLabel = `Update v${m.version}`; statusVariant = 'update' }
+        else if (storeInstalled) { statusLabel = 'Installed'; statusVariant = 'installed' }
         return (
-          <div key={item.id} style={s.card} onClick={() => onPick(item)}>
+          <div
+            key={item.id}
+            role="button"
+            tabIndex={0}
+            style={s.card}
+            onClick={() => onPick(item)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(item) } }}
+            aria-label={`${m.name} — ${statusLabel}. Tap for details.`}
+          >
             <IconBox item={item} />
             <div style={s.cardName}>{m.name}</div>
             <div style={s.cardVersion}>v{m.version}</div>
             {m.description ? (
               <div style={s.cardDesc}>{m.description}</div>
             ) : null}
-            <button
-              style={s.cardBtn(btnVariant)}
-              onClick={handleBtnClick}
-            >
-              {btnLabel}
-            </button>
+            <span style={s.cardStatus(statusVariant)}>
+              {statusLabel}
+            </span>
           </div>
         )
       })}
