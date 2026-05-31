@@ -93,25 +93,66 @@ const s = {
   catalogGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-    gap: '14px',
+    gap: '16px',
   },
-  card: {
+  // Card variants:
+  //  - 'default'  — not installed: standard border
+  //  - 'installed' — already installed: same border + a check dot in the icon corner
+  //  - 'update'    — installed-but-old: accent border so the card itself signals
+  //                  "you should look at this" before the user reads the pill
+  //  - 'error'     — manifest fetch failed: dashed muted border, no hover lift
+  card: (variant = 'default') => ({
+    position: 'relative',
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', textAlign: 'center',
-    padding: '14px 10px', background: 'var(--surface)',
-    border: '1px solid var(--border)', borderRadius: '12px',
-    cursor: 'pointer',
-    transition: 'border-color 0.15s, transform 0.1s',
-  },
+    padding: '16px 12px', background: 'var(--surface)',
+    border: variant === 'update'
+      ? '1px solid var(--accent)'
+      : variant === 'error'
+      ? '1px dashed var(--border)'
+      : '1px solid var(--border)',
+    borderRadius: '12px',
+    cursor: variant === 'error' ? 'default' : 'pointer',
+    transition: 'border-color 150ms, transform 150ms, box-shadow 150ms, background 150ms',
+    minHeight: '44px',
+    outline: 'none',
+  }),
   iconWrap: {
     width: '88px', height: '88px', borderRadius: '20px',
     background: 'var(--surface2)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    marginBottom: '10px', flexShrink: 0, overflow: 'hidden',
+    flexShrink: 0, overflow: 'hidden',
+  },
+  // A relative anchor around the IconBox so the "installed" check dot
+  // can sit at the icon's bottom-right corner without leaking out of
+  // IconBox's `overflow: hidden`. Spacing-below lives on this slot.
+  iconSlot: {
+    position: 'relative',
+    marginBottom: '12px',
+    display: 'inline-block',
   },
   iconImg: { width: '100%', height: '100%', objectFit: 'cover' },
   iconLetter: {
     fontSize: '34px', fontWeight: 700, color: 'var(--accent)',
+  },
+  // A tiny check dot sits at the icon's bottom-right when the app is
+  // already installed. Quicker to read than the pill text, lets the
+  // grid double as an "at a glance" inventory.
+  installedDot: {
+    position: 'absolute',
+    bottom: '-2px', right: '-2px',
+    width: '22px', height: '22px', borderRadius: '999px',
+    background: 'var(--surface)',
+    border: '2px solid var(--surface)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
+  },
+  installedDotInner: {
+    width: '18px', height: '18px', borderRadius: '999px',
+    background: 'color-mix(in srgb, var(--accent) 80%, var(--surface))',
+    color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '12px', fontWeight: 700, lineHeight: 1,
   },
   cardName: {
     fontSize: '14px', fontWeight: 600, lineHeight: 1.25,
@@ -122,15 +163,25 @@ const s = {
   cardVersion: {
     fontSize: '11px', color: 'var(--muted)',
     fontFamily: 'var(--mono, monospace)',
-    marginBottom: '6px',
+    marginBottom: '8px',
   },
   cardDesc: {
     fontSize: '12px', color: 'var(--muted)', lineHeight: 1.35,
-    marginBottom: '10px',
+    marginBottom: '12px',
     display: '-webkit-box', WebkitLineClamp: 3,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
     textAlign: 'center',
     minHeight: '48px',
+  },
+  // Top-border separator between the description and the status pill —
+  // gives the pill a visual ground line so it reads as a footer caption
+  // rather than another floating chip.
+  cardStatusRow: {
+    width: '100%',
+    paddingTop: '8px',
+    borderTop: '1px solid var(--border)',
+    marginTop: 'auto',
+    display: 'flex', justifyContent: 'center',
   },
   // Grid-card status pill — readonly. The card itself takes the tap
   // to the detail view; the detail view owns the Install / Update /
@@ -140,6 +191,7 @@ const s = {
     padding: '4px 10px', borderRadius: '999px',
     fontFamily: 'var(--font)', letterSpacing: '0.01em',
     border: '1px solid',
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
     background: variant === 'update'
       ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
       : variant === 'installed'
@@ -152,6 +204,42 @@ const s = {
                : variant === 'installed' ? 'var(--border)'
                : 'var(--border)',
   }),
+  cardStatusDot: (variant) => ({
+    width: '6px', height: '6px', borderRadius: '999px',
+    background: variant === 'update' ? 'var(--accent)'
+              : variant === 'installed'
+              ? 'color-mix(in srgb, var(--text) 50%, transparent)'
+              : 'color-mix(in srgb, var(--muted) 60%, transparent)',
+    flexShrink: 0,
+  }),
+  // Skeleton placeholder — same shape as a card so the grid doesn't
+  // reflow when the real manifests arrive.
+  skeletonCard: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    padding: '16px 12px',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)', borderRadius: '12px',
+    minHeight: '44px',
+    opacity: 0.7,
+  },
+  skeletonBlock: (w, h) => ({
+    width: w, height: h, borderRadius: '6px',
+    background: 'color-mix(in srgb, var(--text) 8%, transparent)',
+    animation: 'mobius-store-pulse 1.4s ease-in-out infinite',
+  }),
+  cardErrorBody: {
+    fontSize: '12px', color: 'var(--muted)', lineHeight: 1.4,
+    marginTop: '4px', marginBottom: '12px',
+    textAlign: 'center',
+  },
+  cardRetryBtn: {
+    padding: '6px 12px', borderRadius: '8px',
+    border: '1px solid var(--border)', background: 'transparent',
+    color: 'var(--text)', fontSize: '12px', fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'var(--font)',
+    minHeight: '32px',
+    transition: 'background 150ms',
+  },
   // kept for the detail view's primary/secondary buttons
   cardBtn: (variant) => ({
     width: '100%',
@@ -643,67 +731,165 @@ function UninstallConfirmModal({ app, busy, onConfirm, onCancel }) {
   )
 }
 
-function CatalogList({ items, installed, installedVersions, onPick, onOpenInstalled }) {
+// One catalog tile. Pulled out so the focus/hover styles can live in
+// local state without rerendering the whole grid on every pointer move.
+function CatalogCard({ item, installed, installedVersions, onPick, onRetry }) {
+  const [hover, setHover] = useState(false)
+  const [focus, setFocus] = useState(false)
+  const m = item.manifest
+
+  if (!m) {
+    // Manifest hasn't loaded (or failed). Two sub-states:
+    //  - error → muted dashed border + a small "Try again" affordance
+    //  - still loading → skeleton (handled at the grid level instead;
+    //    this branch only runs after the load resolved with no manifest)
+    if (item.error) {
+      return (
+        <div style={s.card('error')}>
+          <div style={{ ...s.iconWrap, marginBottom: '12px' }}>
+            <span style={s.iconLetter}>{item.id.charAt(0).toUpperCase()}</span>
+          </div>
+          <div style={s.cardName}>{item.id}</div>
+          <div style={s.cardErrorBody}>
+            This app's manifest didn't load.
+          </div>
+          {onRetry && (
+            <button
+              style={s.cardRetryBtn}
+              onClick={(e) => { e.stopPropagation(); onRetry(item) }}
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      )
+    }
+    // Defensive — shouldn't render once skeletons land. Keep the slug
+    // visible so a stuck card is still recognizable.
+    return (
+      <div style={s.card('default')}>
+        <div style={s.iconWrap}>
+          <span style={s.iconLetter}>{item.id.charAt(0).toUpperCase()}</span>
+        </div>
+        <div style={s.cardName}>{item.id}</div>
+        <div style={s.cardVersion}>loading…</div>
+      </div>
+    )
+  }
+
+  // Match by manifest_url — the URL the app was installed from.
+  // Slug is now pure routing (allocate_unique_slug on collision);
+  // identity lives on manifest_url. A user-built app and a store-
+  // installed app with the same slug coexist; the store can find
+  // its own apps regardless of slug bumps.
+  const storeInstalled = installed.find(a => a.manifest_url === item.manifest_url)
+  const installedVer = installedVersions[item.id]
+  const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
+
+  // Pill text + the accent dot prefix. Card-level variant (border /
+  // installed-dot) is computed alongside so the visual signal lands
+  // before the user finishes parsing the pill text.
+  let statusLabel = 'Not installed'
+  let statusVariant = 'available'
+  let cardVariant = 'default'
+  if (storeInstalled && hasUpdate) {
+    statusLabel = `Update available · v${m.version}`
+    statusVariant = 'update'
+    cardVariant = 'update'
+  } else if (storeInstalled) {
+    statusLabel = 'Installed'
+    statusVariant = 'installed'
+    cardVariant = 'installed'
+  }
+
+  // Subtle lift on hover/focus so the tap target reads as interactive.
+  // Update-available cards already carry an accent border, so we only
+  // shadow + bump them rather than swapping border colour.
+  const elevated = hover || focus
+  const cardStyle = {
+    ...s.card(cardVariant),
+    ...(elevated ? {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 16px color-mix(in srgb, var(--accent) 14%, transparent)',
+      borderColor: cardVariant === 'update' ? 'var(--accent)' : 'var(--accent)',
+    } : null),
+    ...(focus ? {
+      boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent)',
+    } : null),
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      style={cardStyle}
+      onClick={() => onPick(item)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(item) } }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      aria-label={`${m.name} — ${statusLabel}. Tap for details.`}
+    >
+      <div style={s.iconSlot}>
+        <IconBox item={item} />
+        {cardVariant === 'installed' && (
+          <div style={s.installedDot} aria-hidden="true">
+            <div style={s.installedDotInner}>✓</div>
+          </div>
+        )}
+      </div>
+      <div style={s.cardName}>{m.name}</div>
+      <div style={s.cardVersion}>v{m.version}</div>
+      {m.description ? (
+        <div style={s.cardDesc}>{m.description}</div>
+      ) : null}
+      <div style={s.cardStatusRow}>
+        <span style={s.cardStatus(statusVariant)}>
+          <span style={s.cardStatusDot(statusVariant)} aria-hidden="true" />
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function CatalogList({ items, installed, installedVersions, onPick, onRetry }) {
   if (items.length === 0) {
     return <div style={s.empty}>No apps in the catalog yet.</div>
   }
   return (
     <div style={s.catalogGrid}>
-      {items.map(item => {
-        if (!item.manifest) {
-          return (
-            <div key={item.id} style={{ ...s.card, opacity: 0.6 }}>
-              <div style={s.iconWrap}>
-                <span style={s.iconLetter}>{item.id.charAt(0).toUpperCase()}</span>
-              </div>
-              <div style={s.cardName}>{item.id}</div>
-              <div style={s.cardVersion}>
-                {item.error ? 'fetch failed' : 'loading…'}
-              </div>
-            </div>
-          )
-        }
-        const m = item.manifest
-        // Match by manifest_url — the URL the app was installed from.
-        // Slug is now pure routing (allocate_unique_slug on collision);
-        // identity lives on manifest_url. A user-built app and a store-
-        // installed app with the same slug coexist; the store can find
-        // its own apps regardless of slug bumps.
-        const storeInstalled = installed.find(a => a.manifest_url === item.manifest_url)
-        const installedVer = installedVersions[item.id]
-        const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
-        // Status pill instead of an action button. The card itself
-        // takes the tap to the detail view; the detail view's Install
-        // / Update / Open button is the actual action. The earlier
-        // grid-level button was a labelled-trap: "Install" only opened
-        // the detail page, never installed directly — so the click
-        // didn't do what the label said.
-        let statusLabel = 'Not installed'
-        let statusVariant = 'available'
-        if (storeInstalled && hasUpdate) { statusLabel = `Update v${m.version}`; statusVariant = 'update' }
-        else if (storeInstalled) { statusLabel = 'Installed'; statusVariant = 'installed' }
-        return (
-          <div
-            key={item.id}
-            role="button"
-            tabIndex={0}
-            style={s.card}
-            onClick={() => onPick(item)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(item) } }}
-            aria-label={`${m.name} — ${statusLabel}. Tap for details.`}
-          >
-            <IconBox item={item} />
-            <div style={s.cardName}>{m.name}</div>
-            <div style={s.cardVersion}>v{m.version}</div>
-            {m.description ? (
-              <div style={s.cardDesc}>{m.description}</div>
-            ) : null}
-            <span style={s.cardStatus(statusVariant)}>
-              {statusLabel}
-            </span>
-          </div>
-        )
-      })}
+      {items.map(item => (
+        <CatalogCard
+          key={item.id}
+          item={item}
+          installed={installed}
+          installedVersions={installedVersions}
+          onPick={onPick}
+          onRetry={onRetry}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Skeleton grid shown while catalog manifests are being fetched. Same
+// card footprint as the real grid, so the layout doesn't shift when
+// manifests resolve. Pulse keyframe is registered globally at root.
+function CatalogSkeleton({ count = 5 }) {
+  return (
+    <div style={s.catalogGrid}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} style={s.skeletonCard} aria-hidden="true">
+          <div style={{ ...s.skeletonBlock('88px', '88px'), borderRadius: '20px', marginBottom: '12px' }} />
+          <div style={{ ...s.skeletonBlock('72%', '12px'), marginBottom: '6px' }} />
+          <div style={{ ...s.skeletonBlock('40%', '10px'), marginBottom: '12px' }} />
+          <div style={{ ...s.skeletonBlock('90%', '8px'), marginBottom: '6px' }} />
+          <div style={{ ...s.skeletonBlock('80%', '8px'), marginBottom: '6px' }} />
+          <div style={{ ...s.skeletonBlock('60%', '8px') }} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -872,6 +1058,20 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
   )
 }
 
+// One small `<style>` injected at the root so we can use keyframes
+// (inline `style` props don't support @keyframes). Kept tightly scoped
+// to this app's class names so it can't bleed into the shell.
+function GlobalKeyframes() {
+  return (
+    <style>{`
+      @keyframes mobius-store-pulse {
+        0%, 100% { opacity: 0.55; }
+        50% { opacity: 0.95; }
+      }
+    `}</style>
+  )
+}
+
 export default function App({ appId, token }) {
   const [tab, setTab] = useState('browse')
   const [catalog, setCatalog] = useState(() =>
@@ -926,6 +1126,25 @@ export default function App({ appId, token }) {
     const apps = await loadInstalledApps(token)
     setInstalled(apps)
   }, [token])
+
+  // Re-fetch a single catalog manifest. Wired into CatalogCard's
+  // "Try again" affordance — replaces the previous behavior where a
+  // failed manifest stayed dead until the whole app reloaded.
+  const retryCatalogItem = useCallback(async (item) => {
+    setCatalog(prev => prev.map(c =>
+      c.id === item.id ? { ...c, manifest: null, error: null, _retrying: true } : c
+    ))
+    try {
+      const manifest = await fetchManifest(item.manifest_url)
+      setCatalog(prev => prev.map(c =>
+        c.id === item.id ? { ...c, manifest, error: null, _retrying: false } : c
+      ))
+    } catch (e) {
+      setCatalog(prev => prev.map(c =>
+        c.id === item.id ? { ...c, manifest: null, error: e.message || String(e), _retrying: false } : c
+      ))
+    }
+  }, [])
 
   // Wire the moebius:open-app postMessage with a toast fallback for
   // the (defensive) standalone case. The shell handler validates the
@@ -1117,6 +1336,7 @@ export default function App({ appId, token }) {
   if (detail) {
     return (
       <div style={s.root}>
+        <GlobalKeyframes />
         <DetailView
           item={detail}
           installed={installed}
@@ -1157,6 +1377,7 @@ export default function App({ appId, token }) {
 
   return (
     <div style={s.root}>
+      <GlobalKeyframes />
       <div style={s.header}>
         <div style={s.titleRow}>
           <h1 style={s.title}>App Store</h1>
@@ -1174,13 +1395,13 @@ export default function App({ appId, token }) {
       <div style={s.scroll}>
         {tab === 'browse' && (
           loadingCatalog
-            ? <div style={s.spinner}>Loading catalog…</div>
+            ? <CatalogSkeleton count={CATALOG.length} />
             : <CatalogList
                 items={catalog}
                 installed={installed}
                 installedVersions={installedVersions}
                 onPick={(item) => item.manifest && openDetail(item)}
-                onOpenInstalled={handleOpenInstalled}
+                onRetry={retryCatalogItem}
               />
         )}
         {tab === 'url' && (
