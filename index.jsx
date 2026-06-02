@@ -661,11 +661,8 @@ function IconBox({ item, size = 'normal' }) {
 // without baking version into description prose.
 async function loadInstalledVersions(appId, token) {
   try {
-    const r = await fetch(`/api/storage/apps/${appId}/installed-versions.json`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (r.status === 404) return {}
-    const data = await r.json()
+    const data = await window.mobius.storage.get('installed-versions.json')
+    if (data === null) return {}
     return typeof data === 'string' ? JSON.parse(data) : (data || {})
   } catch {
     return {}
@@ -673,14 +670,7 @@ async function loadInstalledVersions(appId, token) {
 }
 
 async function saveInstalledVersions(appId, token, map) {
-  await fetch(`/api/storage/apps/${appId}/installed-versions.json`, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(map),
-  })
+  await window.mobius.storage.set('installed-versions.json', map)
 }
 
 // Ask the shell to switch to the installed app via the
