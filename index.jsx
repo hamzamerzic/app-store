@@ -755,17 +755,28 @@ async function fetchManifest(url) {
 }
 
 // Compare two semver strings. Returns -1 / 0 / 1. Bad input → 0.
+// Compares the full numeric core (not just 3 segments, so a 4th segment isn't
+// dropped) and honors SemVer pre-release precedence: 1.2.0-rc.1 < 1.2.0, so a
+// pre-release never reads as "up to date" against its own release.
 function semverCmp(a, b) {
   if (!a || !b) return 0
-  const pa = String(a).split('.').map(n => parseInt(n, 10))
-  const pb = String(b).split('.').map(n => parseInt(n, 10))
-  for (let i = 0; i < 3; i++) {
+  const core = (v) => String(v).split('+')[0].split('-')[0]
+  const pre = (v) => { const m = String(v).split('+')[0].split('-').slice(1).join('-'); return m || '' }
+  const pa = core(a).split('.').map(n => parseInt(n, 10) || 0)
+  const pb = core(b).split('.').map(n => parseInt(n, 10) || 0)
+  const len = Math.max(pa.length, pb.length, 3)
+  for (let i = 0; i < len; i++) {
     const va = pa[i] || 0
     const vb = pb[i] || 0
     if (va < vb) return -1
     if (va > vb) return 1
   }
-  return 0
+  // Equal numeric core: a release (no pre-release) outranks a pre-release.
+  const ra = pre(a), rb = pre(b)
+  if (ra === rb) return 0
+  if (!ra) return 1
+  if (!rb) return -1
+  return ra < rb ? -1 : ra > rb ? 1 : 0
 }
 
 // Heart of the install flow. One call to POST /api/apps/install — the
@@ -1708,12 +1719,15 @@ export default function App({ appId, token }) {
         const text = await r.text()
         throw new Error(`Uninstall failed: ${r.status} ${text}`)
       }
-      // Drop the version record too. We key by catalog id (or
-      // 'custom' for paste-a-URL), which matches what install wrote.
-      // Match by manifest.id ↔ app.slug (not name — see install path).
+      // Drop the version record too, matched by the canonical identity key the
+      // backend stamps on every install — NOT slug == manifest.id. A slug can be
+      // suffixed on collision (e.g. "news-2"), so a slug match would miss it and
+      // leave a stale version entry that fakes an "update available" on reinstall.
       const next = { ...installedVersions }
       for (const item of catalog) {
-        if (item.manifest && item.manifest.id === app.slug) {
+        const manifestId = item.manifest?.id || item.id
+        if (app.manifest_url &&
+            canonicalIdentityKey(item.manifest_url, manifestId) === app.manifest_url) {
           delete next[item.id]
         }
       }
