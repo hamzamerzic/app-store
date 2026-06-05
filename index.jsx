@@ -61,7 +61,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.3'
+const STORE_VERSION = '1.4.4'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -130,7 +130,7 @@ export function canonicalIdentityKey(url, manifestId) {
 // Every installed row carries the canonical identity key (the backend
 // canonicalises on every install + update path); matching by canonical
 // key is the single source of truth.
-function findInstalled(installed, item) {
+export function findInstalled(installed, item) {
   const manifestId = item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
   return installed.find(a => a.manifest_url === canonical) || null
@@ -1784,9 +1784,10 @@ export default function App({ appId, token }) {
     })
     setUpdateNotice(null)
     try {
-      // The backend decides install vs update based on manifest.id ↔
-      // App.slug match. We pass manifest + raw_base; the install endpoint
-      // re-fetches nothing else from us.
+      // The backend decides install vs update from the canonical manifest
+      // identity, not the installed slug (slugs can be suffixed on collision).
+      // We pass manifest + raw_base; the install endpoint re-fetches nothing
+      // else from us.
       const result = await installApp({
         manifest: item.manifest,
         raw_base: item.raw_base,

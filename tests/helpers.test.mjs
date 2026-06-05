@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile)
 const root = dirname(fileURLToPath(import.meta.url))
 const buildDir = join(root, '.build')
 const bundled = join(buildDir, 'index.mjs')
+const reactStub = join(root, 'react-stub.mjs')
 
 async function bundle() {
   await rm(buildDir, { recursive: true, force: true })
@@ -20,6 +21,8 @@ async function bundle() {
     '--format=esm',
     '--platform=node',
     '--jsx=automatic',
+    `--alias:react=${reactStub}`,
+    `--alias:react/jsx-runtime=${reactStub}`,
     `--outfile=${bundled}`,
   ])
   return import(pathToFileURL(bundled))
@@ -36,6 +39,26 @@ test('canonicalIdentityKey matches backend-style manifest identities', async () 
     canonicalIdentityKey('https://example.test/apps/custom/manifest.json', 'custom'),
     'https://example.test/apps/custom#manifest-id=custom',
   )
+})
+
+test('findInstalled matches canonical manifest identity, not slug', async () => {
+  const { findInstalled } = await bundle()
+  const installed = [
+    {
+      id: 55,
+      slug: 'cuberun-2',
+      name: 'CubeRun',
+      manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main#manifest-id=cuberun',
+      version: '1.0.0-mobius.4',
+    },
+  ]
+  const item = {
+    id: 'cuberun',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/mobius.json',
+    manifest: { id: 'cuberun' },
+  }
+
+  assert.equal(findInstalled(installed, item), installed[0])
 })
 
 test('validateManifestUrl only accepts http(s) manifest URLs', async () => {
