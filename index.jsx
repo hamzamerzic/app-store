@@ -294,6 +294,15 @@ const CSS = `
   font-size: 11px; color: var(--muted);
   font-family: var(--mono, monospace);
   margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.st-card-agent {
+  font-family: var(--font, inherit); font-weight: 600;
+  font-size: 10px; letter-spacing: 0.02em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 999px; padding: 1px 7px;
 }
 .st-card-desc {
   font-size: 12px; color: var(--muted); line-height: 1.35;
@@ -1272,7 +1281,12 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
         )}
       </div>
       <div className="st-card-name">{m.name}</div>
-      <div className="st-card-version">v{m.version}</div>
+      <div className="st-card-version">
+        v{m.version}
+        {m.embeds_agent ? (
+          <span className="st-card-agent" title="This app has a built-in agent">agent</span>
+        ) : null}
+      </div>
       {m.description ? (
         <div className="st-card-desc">{m.description}</div>
       ) : null}
