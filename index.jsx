@@ -2022,6 +2022,7 @@ export default function App({ appId, token }) {
         )
         if (cancelled) return
         setCatalog(hydrated)
+        window.mobius?.signal?.('app_ready', { installed_count: apps.length })
       } finally {
         if (!cancelled) setLoadingCatalog(false)
       }
@@ -2158,6 +2159,7 @@ export default function App({ appId, token }) {
       await refreshInstalled()
 
       if (isSeamlessUpdate) {
+        window.mobius?.signal?.('app_updated', { slug: result.id || item.id })
         setToast({
           kind: 'success',
           message: `Updated to v${result.version || item.manifest?.version}.`,
@@ -2173,6 +2175,7 @@ export default function App({ appId, token }) {
         // edit), which made this prompt fire on untouched apps like News. Only
         // a real conflict (handled above) is worth surfacing; a clean result
         // is just a quiet success.
+        window.mobius?.signal?.('app_updated', { slug: result.id || item.id })
         setToast({
           kind: 'success',
           message: `Updated to v${result.version || item.manifest?.version}.`,
@@ -2184,6 +2187,11 @@ export default function App({ appId, token }) {
       const warnSuffix = result.warnings.length
         ? ` (with notes: ${result.warnings.join('; ')})`
         : ''
+      if (result.mode === 'update') {
+        window.mobius?.signal?.('app_updated', { slug: result.id || item.id })
+      } else {
+        window.mobius?.signal?.('app_installed', { slug: result.id || item.id })
+      }
       // No "reload to see it in the drawer" hint — the backend emits an
       // app_updated SSE event after install/update, and the shell listens
       // for that and refreshes its drawer automatically. The toast just
@@ -2202,6 +2210,7 @@ export default function App({ appId, token }) {
     } catch (e) {
       const message = e.message || String(e)
       setCardErrors(prev => ({ ...prev, [item.id]: message }))
+      window.mobius?.signal?.('error', { message, source: 'install' })
       setToast({ kind: 'error', message })
     } finally {
       setBusy(false)
@@ -2273,6 +2282,7 @@ export default function App({ appId, token }) {
       setInstalledVersions(next)
       await saveInstalledVersions(appId, token, next)
       await refreshInstalled()
+      window.mobius?.signal?.('app_uninstalled', { slug: app.slug || app.id })
       setToast({ kind: 'success', message: `${app.name} uninstalled.` })
       setPendingUninstall(null)
       closeDetail()
