@@ -80,7 +80,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.16'
+const STORE_VERSION = '1.4.17'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -843,27 +843,59 @@ export function scheduleSummary(schedule) {
   return ''
 }
 
+// Resolve the icon URL for an item, and flag whether it is an external
+// (public-git-host) URL or a same-origin one. External icons can't be used
+// as a direct <img src> under prod's img-src 'self' data: CSP — they have
+// to be fetched through the server proxy and turned into a blob: object URL.
 function appIcon(item) {
-  // Catalog cards use raw_base + manifest.icon for the preview.
-  // Installed apps surface the in-Möbius icon endpoint.
-  if (item.installed_icon_url) return item.installed_icon_url
+  // Installed apps surface the in-Möbius icon endpoint (same-origin).
+  if (item.installed_icon_url) return { url: item.installed_icon_url, external: false }
+  // Catalog cards use raw_base + manifest.icon for the preview (external).
   if (item.manifest && item.manifest.icon && item.raw_base) {
-    return item.raw_base + item.manifest.icon
+    return { url: item.raw_base + item.manifest.icon, external: true }
   }
-  return null
+  return { url: null, external: false }
 }
 
-function IconBox({ item, size = 'normal' }) {
-  const url = appIcon(item)
+function IconBox({ item, size = 'normal', token }) {
+  const { url, external } = appIcon(item)
   const [errored, setErrored] = useState(false)
+  // For external icons, the blob: object URL the proxy fetch produced.
+  // Same-origin icons render directly from `url`.
+  const [blobUrl, setBlobUrl] = useState(null)
   const wrapClass = size === 'hero' ? 'st-hero-icon' : 'st-icon-wrap'
   const letterClass = size === 'hero' ? 'st-hero-icon-letter' : 'st-icon-letter'
   const name = (item.manifest && item.manifest.name) || item.name || '?'
   const letter = name.charAt(0).toUpperCase()
-  if (url && !errored) {
+
+  // Fetch external icons through the proxy and expose them as a blob: URL.
+  // The object URL is revoked on cleanup / when the source URL changes so
+  // we don't leak it across re-renders (icon URL changes when the catalog
+  // hydrates or a different item mounts into this slot).
+  useEffect(() => {
+    if (!url || !external) { setBlobUrl(null); return }
+    let revoked = false
+    let objectUrl = null
+    setErrored(false)
+    fetch(proxyUrl(url), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => { if (!r.ok) throw new Error(`icon ${r.status}`); return r.blob() })
+      .then(blob => {
+        if (revoked) return
+        objectUrl = URL.createObjectURL(blob)
+        setBlobUrl(objectUrl)
+      })
+      .catch(() => { if (!revoked) setErrored(true) })
+    return () => {
+      revoked = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [url, external, token])
+
+  const src = external ? blobUrl : url
+  if (src && !errored) {
     return (
       <div className={wrapClass}>
-        <img src={url} alt="" className="st-icon-img" loading="lazy"
+        <img src={src} alt="" className="st-icon-img" loading="lazy"
              onError={() => setErrored(true)} />
       </div>
     )
@@ -977,9 +1009,24 @@ async function loadInstalledApps(token) {
   return await r.json()
 }
 
-async function fetchManifest(url) {
+// External resources (catalog manifests + icons) live on public git hosts
+// (raw.githubusercontent.com etc). Prod's CSP is connect-src 'self' /
+// img-src 'self' data:, so a direct fetch() or <img src="https://…"> to
+// those hosts is BLOCKED. Everything external goes through the same-origin
+// server proxy instead, which is authenticated (Bearer) and same-origin
+// (so it clears the connect-src 'self' rule). The proxy streams the raw
+// upstream body back with the upstream status + content-type, so callers
+// treat the response exactly like a direct fetch.
+function proxyUrl(extUrl) {
+  return `/api/proxy?url=${encodeURIComponent(extUrl)}`
+}
+
+async function fetchManifest(url, token) {
   const manifestUrl = validateManifestUrl(url)
-  const r = await fetch(manifestUrl, { cache: 'no-cache' })
+  const r = await fetch(proxyUrl(manifestUrl), {
+    cache: 'no-cache',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
   if (!r.ok) throw new Error(`Manifest fetch failed: ${r.status}`)
   return await r.json()
 }
@@ -1238,7 +1285,7 @@ function cardVariantClass(variant) {
 // One catalog tile. The interactive lift (hover/focus) now lives in CSS
 // pseudo-classes on .st-card[role="button"] rather than JS state, so the
 // grid no longer rerenders a tile on every pointer move.
-function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUpdate, busy, blocked, error }) {
+function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUpdate, busy, blocked, error, token }) {
   const m = item.manifest
 
   if (!m) {
@@ -1352,7 +1399,7 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
       aria-label={`${m.name} — ${statusLabel}. Tap for details.`}
     >
       <div className="st-icon-slot">
-        <IconBox item={item} />
+        <IconBox item={item} token={token} />
         {(cardVariant === 'installed' || cardVariant === 'update') && (
           <div className="st-installed-dot" aria-hidden="true">
             <div className={`st-installed-dot-inner${cardVariant === 'update' ? ' is-update' : ''}`}>
@@ -1396,7 +1443,7 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
   )
 }
 
-function CatalogList({ items, installed, installedVersions, onPick, onRetry, onUpdate, busy, busyItemId, errors }) {
+function CatalogList({ items, installed, installedVersions, onPick, onRetry, onUpdate, busy, busyItemId, errors, token }) {
   if (items.length === 0) {
     return (
       <div className="st-empty">
@@ -1418,6 +1465,7 @@ function CatalogList({ items, installed, installedVersions, onPick, onRetry, onU
           busy={busyItemId === item.id}
           blocked={busy && busyItemId !== item.id}
           error={errors?.[item.id]}
+          token={token}
         />
       ))}
     </div>
@@ -1455,7 +1503,7 @@ function hostnameOf(raw) {
   try { return new URL(trimmed).hostname } catch { return '' }
 }
 
-function FromUrlTab({ onPreview }) {
+function FromUrlTab({ onPreview, token }) {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -1476,7 +1524,7 @@ function FromUrlTab({ onPreview }) {
     setError('')
     try {
       const trimmed = validateManifestUrl(typed)
-      const manifest = await fetchManifest(trimmed)
+      const manifest = await fetchManifest(trimmed, token)
       const missing = ['id', 'name', 'version', 'description', 'entry']
         .filter(k => !manifest[k])
       if (missing.length) {
@@ -1532,7 +1580,7 @@ function FromUrlTab({ onPreview }) {
   )
 }
 
-function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall, onOpenInstalled, busy, updateNotice, onReviewUpdate, onDismissNotice }) {
+function DetailView({ item, installed, installedVersions, onBack, onInstall, onUninstall, onOpenInstalled, busy, updateNotice, onReviewUpdate, onDismissNotice, token }) {
   const m = item.manifest
   // Match by manifest_url — see CatalogList comment. Slug collisions
   // between user apps and store apps are resolved transparently by
@@ -1572,7 +1620,7 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
       </div>
       <div className="st-scroll">
         <div className="st-hero">
-          <IconBox item={item} size="hero" />
+          <IconBox item={item} size="hero" token={token} />
           <div className="st-hero-text">
             <h2 className="st-hero-name">{m.name}</h2>
             <div className="st-hero-meta">
@@ -1755,11 +1803,11 @@ function SelfUpdateBanner({ token }) {
 
   useEffect(() => {
     let cancelled = false
-    fetchManifest(STORE_SELF.manifest_url)
+    fetchManifest(STORE_SELF.manifest_url, token)
       .then(m => { if (!cancelled) setLatest(m) })
       .catch(() => {})   // a failed self-check is silent — never block the grid
     return () => { cancelled = true }
-  }, [])
+  }, [token])
 
   const hasUpdate = latest && semverCmp(STORE_VERSION, latest.version) < 0
   if (phase !== 'done' && phase !== 'conflict' && !hasUpdate) return null
@@ -1842,30 +1890,38 @@ export default function App({ appId, token }) {
   const refreshingRef = useRef(false)
 
   // Initial fetch: catalog manifests + installed apps + version map.
+  // Every await is guarded so a single failing network call can't leave the
+  // grid stuck on the skeleton: loadInstalledApps rejects (not just returns
+  // []) on a transport-level error, and the per-manifest hydrate already
+  // catches per-item — so the only thing that could strand loadingCatalog
+  // is an unguarded reject. The finally clears the skeleton unconditionally.
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const [apps, versions] = await Promise.all([
-        loadInstalledApps(token),
-        loadInstalledVersions(appId, token),
-      ])
-      if (cancelled) return
-      setInstalled(apps)
-      setInstalledVersions(versions)
-      // Hydrate each catalog entry.
-      const hydrated = await Promise.all(
-        CATALOG.map(async (c) => {
-          try {
-            const manifest = await fetchManifest(c.manifest_url)
-            return { ...c, manifest, error: null }
-          } catch (e) {
-            return { ...c, manifest: null, error: e.message || String(e) }
-          }
-        })
-      )
-      if (cancelled) return
-      setCatalog(hydrated)
-      setLoadingCatalog(false)
+      try {
+        const [apps, versions] = await Promise.all([
+          loadInstalledApps(token).catch(() => []),
+          loadInstalledVersions(appId, token),
+        ])
+        if (cancelled) return
+        setInstalled(apps)
+        setInstalledVersions(versions)
+        // Hydrate each catalog entry.
+        const hydrated = await Promise.all(
+          CATALOG.map(async (c) => {
+            try {
+              const manifest = await fetchManifest(c.manifest_url, token)
+              return { ...c, manifest, error: null }
+            } catch (e) {
+              return { ...c, manifest: null, error: e.message || String(e) }
+            }
+          })
+        )
+        if (cancelled) return
+        setCatalog(hydrated)
+      } finally {
+        if (!cancelled) setLoadingCatalog(false)
+      }
     }
     load()
     return () => { cancelled = true }
@@ -1913,7 +1969,7 @@ export default function App({ appId, token }) {
       c.id === item.id ? { ...c, manifest: null, error: null, _retrying: true } : c
     ))
     try {
-      const manifest = await fetchManifest(item.manifest_url)
+      const manifest = await fetchManifest(item.manifest_url, token)
       setCatalog(prev => prev.map(c =>
         c.id === item.id ? { ...c, manifest, error: null, _retrying: false } : c
       ))
@@ -1922,7 +1978,7 @@ export default function App({ appId, token }) {
         c.id === item.id ? { ...c, manifest: null, error: e.message || String(e), _retrying: false } : c
       ))
     }
-  }, [])
+  }, [token])
 
   // Wire the moebius:open-app postMessage with a toast fallback for
   // the (defensive) standalone case. The shell handler validates the
@@ -2244,6 +2300,7 @@ export default function App({ appId, token }) {
           updateNotice={updateNotice?.itemId === detail.id ? updateNotice : null}
           onReviewUpdate={handleReviewUpdate}
           onDismissNotice={() => setUpdateNotice(null)}
+          token={token}
         />
         {pendingUninstall && (
           <UninstallConfirmModal
@@ -2300,11 +2357,12 @@ export default function App({ appId, token }) {
                   busy={busy}
                   busyItemId={busyItemId}
                   errors={cardErrors}
+                  token={token}
                 />}
           </>
         )}
         {tab === 'url' && (
-          <FromUrlTab onPreview={openDetail} />
+          <FromUrlTab onPreview={openDetail} token={token} />
         )}
       </div>
 
