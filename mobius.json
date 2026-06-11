@@ -1,7 +1,7 @@
 {
   "id": "store",
   "name": "App Store",
-  "version": "1.4.21",
+  "version": "1.4.22",
   "description": "Discover, install, and update M\u00f6bius apps.",
   "author": "mobius-os",
   "license": "MIT",
@@ -9,6 +9,11 @@
   "icon": "icon.png",
   "entry": "index.jsx",
   "offline_capable": false,
+  "offline": {
+    "reads": false,
+    "writes": "none",
+    "execution": "none"
+  },
   "permissions": {
     "cross_app_access": "none",
     "share_with_apps": "none",
