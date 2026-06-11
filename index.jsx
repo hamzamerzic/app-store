@@ -80,7 +80,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.20'
+const STORE_VERSION = '1.4.21'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -320,6 +320,13 @@ const CSS = `
 @media (prefers-reduced-motion: no-preference) {
   .st-card:has(.st-card-open:active) { transform: scale(0.98); opacity: 0.9; }
 }
+/* Icons float on the card with no tile or border — clean transparent
+   presentation. Almost every catalog repo ships a transparent glossy-3D PNG
+   (mind, dreaming, news, atlas, notes, latex, …); the lone holdout still
+   shipping an opaque baked-in square is cuberun (pending an imagegen regen).
+   The slot only keeps overflow:hidden + the radius so that one opaque square
+   gets its corners clipped to match. The letter fallback (no icon / load
+   error) keeps a surface tile so an iconless app still reads as finished. */
 .st-icon-wrap {
   width: 96px; height: 96px; border-radius: 22px;
   background: transparent;
@@ -331,11 +338,13 @@ const CSS = `
    .st-icon-wrap's overflow: hidden. Spacing-below lives on this slot. */
 .st-icon-slot { position: relative; margin-bottom: 12px; display: inline-block; }
 .st-icon-img { width: 100%; height: 100%; object-fit: contain; }
-/* Letter fallback tile keeps its surface tile so apps without icons
-   (or with load errors) still read as recognisable icon slots. The
-   tile is only present for the letter variant — real icons sit on a
-   transparent background so the icon's own art fills the slot. */
-.st-icon-wrap--letter { background: var(--surface2); }
+/* Letter fallback (no icon / load error) gets a surface tile + border so the
+   initial reads as a recognisable icon slot — real icons float transparent,
+   but an iconless app still looks finished. */
+.st-icon-wrap--letter {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
 .st-icon-letter { font-size: 36px; font-weight: 700; color: var(--accent); }
 /* A tiny check dot sits at the icon's bottom-right when the app is
    already installed. Quicker to read than the pill text, lets the grid
@@ -577,13 +586,16 @@ const CSS = `
 }
 .st-hero { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 .st-hero-text { flex: 1; min-width: 0; }
+/* Detail-view hero icon — clean transparent, same as the grid (see
+   .st-icon-wrap); overflow-clip rounds the lone opaque (cuberun) icon. */
 .st-hero-icon {
   width: 80px; height: 80px; border-radius: 18px;
-  background: transparent; display: flex;
+  background: transparent;
+  display: flex;
   align-items: center; justify-content: center;
   flex-shrink: 0; overflow: hidden;
 }
-.st-hero-icon.is-letter { background: var(--surface2); }
+.st-hero-icon.is-letter { background: var(--surface2); border: 1px solid var(--border); }
 .st-hero-icon-letter { font-size: 32px; font-weight: 700; color: var(--accent); }
 .st-hero-name { font-size: 22px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; user-select: none; }
 .st-hero-meta { font-size: 12px; color: var(--muted); font-family: var(--mono, monospace); user-select: none; }
@@ -922,22 +934,65 @@ export function scheduleSummary(schedule) {
   return ''
 }
 
+// Process-lifetime cache of proxied external icons, keyed by the source
+// (raw.githubusercontent) URL. Each entry is the in-flight (or settled)
+// fetch promise resolving to a blob: object URL, so a card that mounts,
+// unmounts, and re-mounts (store re-open, view switch, the card + the
+// open-detail hero both showing the same app) reuses the one fetch instead
+// of paying another proxy → GitHub round-trip. The backend /api/proxy route
+// emits no Cache-Control and the body is consumed as a blob, so the browser
+// can't HTTP-cache it for us — this Map is the only thing that stops the
+// ~8-9 not-installed catalog icons re-fetching on every render pass.
+//
+// The object URL is deliberately NEVER revoked: the cache OWNS it for the
+// life of the page, which is what lets it outlive component unmounts. The
+// icon set is tiny + bounded by the catalog size, so the leak is negligible
+// and bounded; revoking would defeat the cache. Failures are NOT cached
+// (the rejected promise is dropped from the Map) so a transient proxy/GitHub
+// hiccup retries on the next mount rather than pinning the card to its
+// letter fallback forever.
+const _iconBlobCache = new Map()
+
+function loadIconBlob(srcUrl, token) {
+  const cached = _iconBlobCache.get(srcUrl)
+  if (cached) return cached
+  const p = fetch(proxyUrl(srcUrl), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+    .then(r => {
+      if (!r.ok) throw new Error(`icon ${r.status}`)
+      return r.blob()
+    })
+    .then(blob => URL.createObjectURL(blob))
+    .catch(err => {
+      // Drop the failed promise so the next mount can retry.
+      if (_iconBlobCache.get(srcUrl) === p) _iconBlobCache.delete(srcUrl)
+      throw err
+    })
+  _iconBlobCache.set(srcUrl, p)
+  return p
+}
+
 // Resolve the icon URL for an item, and flag whether it is an external
 // (public-git-host) URL or a same-origin one. External icons can't be used
 // as a direct <img src> under prod's img-src 'self' data: CSP — they have
 // to be fetched through the server proxy and turned into a blob: object URL.
 //
 // Priority:
-//  1. installed_icon_url — set by the caller when the item maps to an installed
-//     app row (points to GET /api/apps/{id}/icon, the raw transparent PNG).
-//  2. External catalog preview — raw_base + manifest.icon, fetched via proxy.
+//  1. External catalog preview — raw_base + manifest.icon, fetched via proxy.
+//     This is the live, transparent catalog icon. We prefer it even for
+//     installed apps because installed_icon_url serves the app's *stored*
+//     icon, which can be a stale pre-regeneration (opaque, PWA-bg) copy.
+//  2. installed_icon_url — set by the caller when the item maps to an installed
+//     app row (GET /api/apps/{id}/icon). Used only when the item has no catalog
+//     source (an installed app that isn't in the catalog).
 function appIcon(item) {
-  // Installed apps use the raw icon route (same-origin, transparent PNG).
-  if (item.installed_icon_url) return { url: item.installed_icon_url, external: false }
-  // Catalog cards use raw_base + manifest.icon for the preview (external).
+  // Catalog source wins: the live transparent icon (external, via proxy).
   if (item.manifest && item.manifest.icon && item.raw_base) {
     return { url: item.raw_base + item.manifest.icon, external: true }
   }
+  // No catalog source — fall back to the installed app's stored icon route.
+  if (item.installed_icon_url) return { url: item.installed_icon_url, external: false }
   return { url: null, external: false }
 }
 
@@ -957,27 +1012,21 @@ function IconBox({ item, size = 'normal', token }) {
   const name = (item.manifest && item.manifest.name) || item.name || '?'
   const letter = name.charAt(0).toUpperCase()
 
-  // Fetch external icons through the proxy and expose them as a blob: URL.
-  // The object URL is revoked on cleanup / when the source URL changes so
-  // we don't leak it across re-renders (icon URL changes when the catalog
-  // hydrates or a different item mounts into this slot).
+  // Fetch external icons through the proxy and expose them as a blob: URL,
+  // routed through the process-lifetime cache so a remount (store re-open,
+  // view switch, card + hero both showing the same app) reuses the one
+  // fetch. The cache owns the object URL for the life of the page — this
+  // effect must NOT revoke it on cleanup, only stop applying a late result
+  // to a stale mount. A cache hit resolves synchronously-fast (already a
+  // settled promise) so the icon paints without a second round-trip.
   useEffect(() => {
     if (!url || !external) { setBlobUrl(null); return }
-    let revoked = false
-    let objectUrl = null
+    let cancelled = false
     setErrored(false)
-    fetch(proxyUrl(url), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then(r => { if (!r.ok) throw new Error(`icon ${r.status}`); return r.blob() })
-      .then(blob => {
-        if (revoked) return
-        objectUrl = URL.createObjectURL(blob)
-        setBlobUrl(objectUrl)
-      })
-      .catch(() => { if (!revoked) setErrored(true) })
-    return () => {
-      revoked = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
+    loadIconBlob(url, token)
+      .then(objectUrl => { if (!cancelled) setBlobUrl(objectUrl) })
+      .catch(() => { if (!cancelled) setErrored(true) })
+    return () => { cancelled = true }
   }, [url, external, token])
 
   const src = external ? blobUrl : url
@@ -986,7 +1035,7 @@ function IconBox({ item, size = 'normal', token }) {
     const imgWrapClass = size === 'hero' ? 'st-hero-icon' : 'st-icon-wrap'
     return (
       <div className={imgWrapClass}>
-        <img src={src} alt="" className="st-icon-img" loading="lazy"
+        <img src={src} alt="" className="st-icon-img" loading="lazy" decoding="async"
              onError={() => setErrored(true)} />
       </div>
     )
