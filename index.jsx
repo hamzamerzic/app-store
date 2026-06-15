@@ -86,7 +86,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.27'
+const STORE_VERSION = '1.4.28'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -2074,7 +2074,13 @@ export default function App({ appId, token }) {
   // mount-time hydrate so the first focus right after open doesn't refetch.
   // A focus flap (visibilitychange + focus a frame apart) won't refetch
   // either: the second event lands well inside the debounce window.
-  const lastManifestRefreshRef = useRef(0)
+  // Seed with mount time, not 0: the focus/pageshow listeners bind a frame
+  // before the async mount hydration finishes, so a focus firing in that gap
+  // would otherwise read a 0 timestamp, clear the debounce, and fire a
+  // redundant duplicate manifest fetch alongside the in-flight mount one.
+  // Stamping "now" makes that first focus a reliable no-op until the 50s
+  // window elapses; the mount effect re-stamps once hydration lands.
+  const lastManifestRefreshRef = useRef(Date.now())
   const manifestRehydratingRef = useRef(false)
 
   // Initial fetch: catalog manifests + installed apps + version map.
@@ -2174,9 +2180,18 @@ export default function App({ appId, token }) {
       )
       const byId = new Map(refetched.filter(Boolean).map(r => [r.id, r.manifest]))
       if (byId.size > 0) {
-        setCatalog(prev => prev.map(c =>
-          byId.has(c.id) ? { ...c, manifest: byId.get(c.id), error: null } : c
-        ))
+        setCatalog(prev => {
+          // Skip the setState (and the re-render it triggers) when every
+          // refetched manifest carries the same version already in state —
+          // an up-to-date store shouldn't re-render on every focus regain.
+          const changed = prev.some(c =>
+            byId.has(c.id) && byId.get(c.id)?.version !== c.manifest?.version
+          )
+          if (!changed) return prev
+          return prev.map(c =>
+            byId.has(c.id) ? { ...c, manifest: byId.get(c.id), error: null } : c
+          )
+        })
       }
       lastManifestRefreshRef.current = Date.now()
     } finally {
@@ -2607,8 +2622,8 @@ export default function App({ appId, token }) {
           <img
             src={`/api/apps/${appId}/icon?size=64`}
             alt=""
-            width={26}
-            height={26}
+            width={40}
+            height={40}
             className="st-brand-icon"
             onError={(e) => {
               e.currentTarget.style.display = 'none'
