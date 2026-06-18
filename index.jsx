@@ -86,7 +86,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.28'
+const STORE_VERSION = '1.4.29'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -168,19 +168,26 @@ export function findInstalled(installed, item) {
 }
 
 function installedVersionFor(item, installedVersions, installedApp) {
-  return installedVersions[item.id] ||
-    installedApp?.version ||
+  // The installed App row's persisted version is the authoritative source —
+  // the backend writes App.version on every install + update path. The local
+  // installed-versions.json cache is only a fallback for the brief window
+  // before that row is fetched; a stale cache entry must never mask the
+  // live row's version.
+  return installedApp?.version ||
     installedApp?.manifest?.version ||
+    installedVersions[item.id] ||
     ''
 }
 
 // One module-level stylesheet rendered once at the app root as
 // <style>{CSS}</style>. Style is via semantic `st-`-prefixed classNames;
-// inline style={} is reserved for render-time dynamic values (the footer
-// CTA's state-driven background, the skeleton block dimensions, the
-// installed-dot's update tint). App-driven variants ride is-* modifier
-// classes, never JS style helpers. Shared chrome (root, segmented tabs,
-// empty, sheet, buttons, toast) is fenced with mobius-ui markers so a
+// inline style={} is reserved for render-time dynamic values (the skeleton
+// block dimensions, the installed-dot's update tint). App-driven variants
+// (including every action button's state) ride is-* / variant classNames,
+// never JS style helpers — the action buttons share the one canonical
+// st-btn component so they're identical across the card and detail views.
+// Shared chrome (root, segmented tabs, empty, sheet, buttons, toast) is
+// fenced with mobius-ui markers so a
 // future extraction into @mobius/ui is mechanical.
 const CSS = `
 /* mobius-ui:Root v1 — keep in sync; library candidate. Diverge below the marker only. */
@@ -265,6 +272,32 @@ const CSS = `
    equally. min-width:0 lets it shrink without overflowing on narrow phones. */
 .st-tabs { display: flex; flex: 1; min-width: 0; gap: 4px; border-radius: 10px; }
 .st-tabs .st-seg-btn { flex: 1; min-width: 0; }
+
+/* The single header-level "Check for updates" control. Its own row below the
+   tabs, right-aligned, low-emphasis so it never competes with the segmented
+   control. min-height reserves space so the transient "Checking…/Up to date"
+   label swap can't shift the grid below it. */
+.st-check-row {
+  display: flex; justify-content: flex-end; align-items: center;
+  min-height: 28px; margin-top: 8px;
+}
+.st-check-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 28px; padding: 4px 10px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--muted); font-family: var(--font);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+  touch-action: manipulation; user-select: none;
+}
+@media (hover: hover) {
+  .st-check-btn:not(:disabled):hover {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  }
+}
+.st-check-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.st-check-btn:disabled { opacity: 0.7; cursor: default; }
 
 /* App-specific catalog grid + tiles. The vertical-tile card diverges
    structurally from the canonical horizontal list Card, so it keeps the
@@ -443,7 +476,12 @@ const CSS = `
   font-family: var(--font);
   touch-action: manipulation; user-select: none;
 }
-.st-card-action.is-update { background: var(--green, var(--accent)); }
+/* Install and Update share the accent primary look so the action button
+   reads identically across every card; the card-level border + checkmark
+   dot (see .st-card.is-update) carry the "update available" signal without
+   an off-brand second button colour. Installed = a muted, lower-emphasis
+   fill so the primary actions stay the eye-catchers in the grid. */
+.st-card-action.is-update { background: var(--accent); }
 .st-card-action.is-installed {
   background: color-mix(in srgb, var(--text) 9%, transparent);
   color: var(--text);
@@ -689,12 +727,18 @@ const CSS = `
 .st-installed-note { font-size: 14px; color: var(--muted); user-select: none; }
 .st-detail-footer {
   padding: 16px; border-top: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 10px;
   flex-shrink: 0; background: var(--bg);
 }
-/* The detail-footer primary CTA + the modal's confirm button share this
-   full-width solid look. The footer CTA overrides background inline
-   because the colour is state-driven (accent / green / blocked). */
+/* Footer CTAs: full-width canonical buttons. The shared .st-btn min-height
+   (44px) keeps the primary's height fixed across every label/busy state, so
+   "Open App" -> "Updating…" never shifts the row; the secondary "Uninstall"
+   sits below as a real, muted button (not an underlined text link) so both
+   actions read as one consistent control family. */
+.st-detail-cta { width: 100%; font-size: 15px; }
+/* Full-width solid accent button for the update-notice "Review in chat" /
+   "Resolve in chat" action. (The detail-footer CTA and modal confirm both
+   use the canonical st-btn now; this stays for the in-flow update notice.) */
 .st-big-btn {
   width: 100%; padding: 12px 16px; border-radius: 10px;
   border: none; background: var(--accent); color: #fff;
@@ -723,19 +767,6 @@ const CSS = `
   .st-danger-btn:not(:disabled):active { opacity: 0.8; }
 }
 .st-danger-btn:disabled { pointer-events: none; opacity: 0.65; }
-/* Subordinate link-style "Uninstall" when the primary CTA is "Open App". */
-.st-secondary-link {
-  align-self: center;
-  padding: 12px 16px; border-radius: 8px;
-  border: none; background: transparent;
-  color: var(--muted); font-size: 13px; font-weight: 500;
-  cursor: pointer; font-family: var(--font);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  min-height: 44px;
-  touch-action: manipulation; user-select: none;
-}
-.st-secondary-link:disabled { pointer-events: none; opacity: 0.5; }
 /* Update notice on the detail view (clean-merge / conflict). App-specific. */
 .st-update-notice {
   margin-top: 12px;
@@ -1495,12 +1526,7 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
   // installed app with the same slug coexist; the store can find
   // its own apps regardless of slug bumps.
   const storeInstalled = findInstalled(installed, item)
-  const recordedVer = installedVersions[item.id]
   const installedVer = installedVersionFor(item, installedVersions, storeInstalled)
-  // A resolved installed version (now persisted as App.version) means there
-  // is nothing to sync; only offer the sync affordance when no version is
-  // known at all and the catalog hasn't reported a genuine update.
-  const needsVersionSync = storeInstalled && !installedVer && !recordedVer
   const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
   // One footer action plus a card-level variant (border / installed-dot)
   // so the state is obvious before the user opens details.
@@ -1511,9 +1537,6 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
     statusLabel = 'Built in'
     cardVariant = 'installed'
   } else if (storeInstalled && hasUpdate) {
-    statusLabel = 'Update'
-    cardVariant = 'update'
-  } else if (needsVersionSync) {
     statusLabel = 'Update'
     cardVariant = 'update'
   } else if (storeInstalled) {
@@ -1749,16 +1772,11 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
   // allocate_unique_slug on the backend; the store reads its own
   // installed apps via manifest_url, never slug.
   const storeInstalled = findInstalled(installed, item)
-  const recordedVer = installedVersions[item.id]
   const installedVer = installedVersionFor(item, installedVersions, storeInstalled)
-  // A resolved installed version (now persisted as App.version) means there
-  // is nothing to sync; only offer the sync affordance when no version is
-  // known at all and the catalog hasn't reported a genuine update.
   // Core apps (Dreaming, Mind) are platform-managed: never offer install /
-  // update / uninstall, only Open. The deploy re-syncs them, so a store update
-  // would fight that — suppress the update + sync affordances here.
+  // update / uninstall, only Open. The deploy re-syncs them, so a store
+  // update would fight that — suppress the update affordance here.
   const isCore = !!item.core
-  const needsVersionSync = !isCore && storeInstalled && !installedVer && !recordedVer
   const hasUpdate = !isCore && storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
   const blockedUpdate = updateNotice?.kind === 'conflict'
   const ca = m.permissions?.cross_app_access || 'none'
@@ -1860,7 +1878,6 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
             <div className="st-section-label">Installed</div>
             <div className="st-installed-note">
               Currently installed: {installedVer ? `v${installedVer}` : 'version unknown'}.
-              {needsVersionSync ? ' Run an update check to sync the store’s version record.' : ''}
             </div>
             {updateNotice && (
               <div className="st-update-notice">
@@ -1909,27 +1926,24 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
 
       </div>
 
-      {/* Footer hierarchy by state:
-          - not installed: single "Install" primary
-          - installed + update available: "Update to vX" primary (green tint)
-            on top, "Uninstall" muted text link below
-          - installed (up-to-date): "Open App" primary on top, "Uninstall"
-            muted text link below — Open is the user's main path, Uninstall
-            shouldn't compete visually for the tap.
+      {/* Footer action row. One button system (the canonical st-btn) across
+          every state so the CTA never changes shape or colour family on a
+          state flip — only its label:
+          - not installed:            [ Install ]            (primary)
+          - installed, up to date:    [ Open App ]           (primary)
+          - installed, update ready:  [ Update to vX ]       (primary)
+                                      [ Uninstall ]          (secondary)
+          - update blocked (conflict):[ Resolve update ]     (primary)
           The Install/Update button commits directly — there is no second
           confirm modal. DetailView is the confirmation surface; the user
           already saw permissions, schedule, esm.sh deps and the host
-          warning above before reaching this button. */}
+          warning above before reaching this button.
+          The primary CTA holds a fixed min-height (via .st-btn) and the row
+          reserves space for the secondary action, so the busy label swap
+          ("Open App" -> "Updating…") never reflows the surrounding layout. */}
       <div className="st-detail-footer">
         <button
-          className="st-big-btn"
-          style={{
-            // State-driven CTA tint: green for an available update / sync,
-            // accent otherwise — kept inline because it's computed per render.
-            background: blockedUpdate
-              ? 'var(--accent)'
-              : (hasUpdate || needsVersionSync) ? 'var(--green)' : 'var(--accent)',
-          }}
+          className="st-btn st-btn-primary st-detail-cta"
           disabled={busy}
           onClick={() => {
             if (busy) return
@@ -1937,21 +1951,24 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
               onReviewUpdate(updateNotice)
               return
             }
-            if (hasUpdate || needsVersionSync) onInstall(item, { isUpdate: true, existingId: storeInstalled.id })
+            if (hasUpdate) onInstall(item, { isUpdate: true, existingId: storeInstalled.id })
             else if (storeInstalled) onOpenInstalled(storeInstalled.id)
             else if (!isCore) onInstall(item, { isUpdate: false })
           }}
         >
           {busy
-            ? (hasUpdate ? 'Updating…' : needsVersionSync ? 'Checking…' : 'Installing…')
+            ? (hasUpdate ? 'Updating…' : 'Installing…')
             : blockedUpdate ? 'Resolve update'
             : hasUpdate ? `Update to v${m.version}`
-            : needsVersionSync ? 'Check for updates'
             : storeInstalled ? 'Open App'
             : 'Install'}
         </button>
         {storeInstalled && !isCore && (
-          <button className="st-secondary-link" onClick={() => onUninstall(storeInstalled)} disabled={busy}>
+          <button
+            className="st-btn st-btn-secondary st-detail-cta"
+            onClick={() => onUninstall(storeInstalled)}
+            disabled={busy}
+          >
             Uninstall
           </button>
         )}
@@ -2065,6 +2082,10 @@ export default function App({ appId, token }) {
   const [updateNotice, setUpdateNotice] = useState(null)
   const [cardErrors, setCardErrors] = useState({})
   const [loadingCatalog, setLoadingCatalog] = useState(true)
+  // Header "Check for updates" control: 'idle' | 'checking' | 'done'. 'done'
+  // is a transient "Up to date" / "Updated" confirmation, cleared on a timer.
+  const [checkState, setCheckState] = useState('idle')
+  const checkDoneTimerRef = useRef(null)
   // Guard against overlapping refreshes when several visibility/focus
   // events fire in quick succession (e.g. drawer-close + tab-focus on
   // mobile fire visibilitychange and focus a frame apart). A simple
@@ -2152,9 +2173,12 @@ export default function App({ appId, token }) {
   // no-op, and rapid tab toggling can't trigger a refetch storm. GitHub raw
   // CDN's ~5min cache is the only inherent freshness lag, well under 50s.
   const REHYDRATE_DEBOUNCE_MS = 50_000
-  const refreshCatalogManifests = useCallback(async (installedApps) => {
+  const refreshCatalogManifests = useCallback(async (installedApps, { force = false } = {}) => {
     if (manifestRehydratingRef.current) return
-    if (Date.now() - lastManifestRefreshRef.current < REHYDRATE_DEBOUNCE_MS) return
+    // The debounce protects against focus/visibility flap storms; an explicit
+    // "Check for updates" tap bypasses it (force) so the user always gets a
+    // fresh fetch on demand.
+    if (!force && Date.now() - lastManifestRefreshRef.current < REHYDRATE_DEBOUNCE_MS) return
     const apps = installedApps || []
     // Only catalog entries that are actually installed can show an Update.
     const targets = CATALOG.filter(c => !c.core && findInstalled(apps, c))
@@ -2198,6 +2222,35 @@ export default function App({ appId, token }) {
       manifestRehydratingRef.current = false
     }
   }, [token])
+
+  // Header "Check for updates" — an explicit, debounce-bypassing re-fetch of
+  // every installed app's upstream manifest. One control in the header (not a
+  // per-card affordance): the focus-driven re-hydrate already keeps the grid
+  // fresh; this is the manual escape hatch for "I just pushed v2, show me now".
+  const handleCheckUpdates = useCallback(async () => {
+    if (checkState === 'checking') return
+    if (checkDoneTimerRef.current) {
+      clearTimeout(checkDoneTimerRef.current)
+      checkDoneTimerRef.current = null
+    }
+    setCheckState('checking')
+    try {
+      const apps = (await refreshInstalled()) || installed
+      await refreshCatalogManifests(apps, { force: true })
+    } finally {
+      setCheckState('done')
+      checkDoneTimerRef.current = setTimeout(() => {
+        setCheckState('idle')
+        checkDoneTimerRef.current = null
+      }, 2400)
+    }
+  }, [checkState, installed, refreshInstalled, refreshCatalogManifests])
+
+  // Clear the pending "done -> idle" timer on unmount so the deferred
+  // setCheckState can't fire after the component is gone.
+  useEffect(() => () => {
+    if (checkDoneTimerRef.current) clearTimeout(checkDoneTimerRef.current)
+  }, [])
 
   // The drawer-delete path lives in the shell, not here — when the user
   // uninstalls from the drawer and navigates back, our `installed`
@@ -2652,6 +2705,23 @@ export default function App({ appId, token }) {
             </button>
           </div>
         </div>
+        {tab === 'browse' && (
+          <div className="st-check-row">
+            <button
+              type="button"
+              className="st-check-btn"
+              onClick={handleCheckUpdates}
+              disabled={checkState === 'checking'}
+              aria-live="polite"
+            >
+              {checkState === 'checking'
+                ? 'Checking…'
+                : checkState === 'done'
+                ? 'Up to date'
+                : 'Check for updates'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="st-scroll" ref={gridScrollRef}
