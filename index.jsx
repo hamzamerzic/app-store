@@ -27,16 +27,16 @@ const CATALOG = [
   },
   // --- Store-installable apps below ---
   {
-    id: 'news',
-    repo: 'mobius-os/app-news',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-news/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-news/main/',
-  },
-  {
     id: 'notes',
     repo: 'mobius-os/app-notes',
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/',
+  },
+  {
+    id: 'news',
+    repo: 'mobius-os/app-news',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-news/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-news/main/',
   },
   {
     id: 'editor',
@@ -51,16 +51,16 @@ const CATALOG = [
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-webstudio/main/',
   },
   {
-    id: 'latex',
-    repo: 'mobius-os/app-latex',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/',
-  },
-  {
     id: 'gym',
     repo: 'mobius-os/app-workout',
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/mobius.json',
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/',
+  },
+  {
+    id: 'atlas',
+    repo: 'mobius-os/app-atlas',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/',
   },
   {
     id: 'tandem',
@@ -69,10 +69,10 @@ const CATALOG = [
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-tandem/main/',
   },
   {
-    id: 'atlas',
-    repo: 'mobius-os/app-atlas',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/',
+    id: 'latex',
+    repo: 'mobius-os/app-latex',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/',
   },
   {
     id: 'cuberun',
@@ -88,7 +88,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.30'
+const STORE_VERSION = '1.4.31'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
