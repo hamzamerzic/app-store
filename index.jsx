@@ -5,35 +5,32 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from
 // mount time and merges the parsed JSON into the card data, so the
 // catalog always reflects the repo's current name/version/description.
 const CATALOG = [
+  // Memory + Reflection are platform CORE apps (installed by
+  // install-core-apps and re-synced on every deploy), not store-installable.
+  // `core: true` surfaces them as "Built in" — discoverable + openable, but
+  // with no install / update / uninstall path, so there is no row to fork
+  // into a dup and no store update to fight the deploy re-sync.
+  // findInstalled() resolves them by slug (still 'mind' / 'dreaming').
+  {
+    id: 'mind',
+    repo: 'mobius-os/app-mind',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-mind/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-mind/main/',
+    core: true,
+  },
+  {
+    id: 'dreaming',
+    repo: 'mobius-os/app-dreaming',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-dreaming/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-dreaming/main/',
+    core: true,
+  },
+  // --- Store-installable apps below ---
   {
     id: 'news',
     repo: 'mobius-os/app-news',
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-news/main/mobius.json',
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-news/main/',
-  },
-  {
-    id: 'atlas',
-    repo: 'mobius-os/app-atlas',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/',
-  },
-  {
-    id: 'gym',
-    repo: 'mobius-os/app-workout',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/',
-  },
-  {
-    id: 'cuberun',
-    repo: 'mobius-os/app-cuberun',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/',
-  },
-  {
-    id: 'latex',
-    repo: 'mobius-os/app-latex',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/',
   },
   {
     id: 'notes',
@@ -54,29 +51,34 @@ const CATALOG = [
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-webstudio/main/',
   },
   {
+    id: 'latex',
+    repo: 'mobius-os/app-latex',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/',
+  },
+  {
+    id: 'gym',
+    repo: 'mobius-os/app-workout',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/',
+  },
+  {
     id: 'tandem',
     repo: 'mobius-os/app-tandem',
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-tandem/main/mobius.json',
     raw_base: 'https://raw.githubusercontent.com/mobius-os/app-tandem/main/',
   },
-  // Dreaming + Mind are platform CORE apps (installed by install-core-apps and
-  // re-synced on every deploy), not store-installable. `core: true` surfaces
-  // them as "Built in" — discoverable + openable, but with no install / update
-  // / uninstall path, so there is no row to fork into a dup and no store
-  // update to fight the deploy re-sync. findInstalled() resolves them by slug.
   {
-    id: 'dreaming',
-    repo: 'mobius-os/app-dreaming',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-dreaming/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-dreaming/main/',
-    core: true,
+    id: 'atlas',
+    repo: 'mobius-os/app-atlas',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/',
   },
   {
-    id: 'mind',
-    repo: 'mobius-os/app-mind',
-    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-mind/main/mobius.json',
-    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-mind/main/',
-    core: true,
+    id: 'cuberun',
+    repo: 'mobius-os/app-cuberun',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/mobius.json',
+    raw_base: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/',
   },
 ]
 
@@ -86,7 +88,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.4.29'
+const STORE_VERSION = '1.4.30'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -656,6 +658,12 @@ const CSS = `
 .st-hero-meta { font-size: 12px; color: var(--muted); font-family: var(--mono, monospace); user-select: none; }
 .st-detail-desc { font-size: 14px; line-height: 1.55; color: var(--text); margin-bottom: 24px; }
 .st-detail-section { margin-bottom: 24px; }
+.st-section {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  letter-spacing: -0.01em; margin: 22px 0 14px;
+  user-select: none;
+}
+.st-scroll > .st-section:first-child { margin-top: 0; }
 .st-section-label {
   font-size: 12px; font-weight: 600; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -885,6 +893,7 @@ const CSS = `
    comfortably sized and intentional on wide screens. The grid floor also
    bumps so cards don't get over-dense. */
 @media (min-width: 720px) {
+  .st-scroll > .st-section,
   .st-scroll > .st-catalog-grid,
   .st-scroll > .st-empty,
   .st-scroll > .st-banner,
@@ -1636,24 +1645,41 @@ function CatalogList({ items, installed, installedVersions, onPick, onRetry, onU
       </div>
     )
   }
+  // Core apps (Memory / Reflection) ship with the platform — group them under
+  // a "Built in" header, ahead of the store-installable apps. CATALOG already
+  // lists the core entries first, so each partition keeps its catalog order.
+  const renderCard = (item) => (
+    <CatalogCard
+      key={item.id}
+      item={item}
+      installed={installed}
+      installedVersions={installedVersions}
+      onPick={onPick}
+      onRetry={onRetry}
+      onUpdate={onUpdate}
+      busy={busyItemId === item.id}
+      blocked={busy && busyItemId !== item.id}
+      error={errors?.[item.id]}
+      token={token}
+    />
+  )
+  const core = items.filter(it => it.core)
+  const rest = items.filter(it => !it.core)
   return (
-    <div className="st-catalog-grid">
-      {items.map(item => (
-        <CatalogCard
-          key={item.id}
-          item={item}
-          installed={installed}
-          installedVersions={installedVersions}
-          onPick={onPick}
-          onRetry={onRetry}
-          onUpdate={onUpdate}
-          busy={busyItemId === item.id}
-          blocked={busy && busyItemId !== item.id}
-          error={errors?.[item.id]}
-          token={token}
-        />
-      ))}
-    </div>
+    <>
+      {core.length > 0 && (
+        <>
+          <h2 className="st-section">Built in</h2>
+          <div className="st-catalog-grid">{core.map(renderCard)}</div>
+        </>
+      )}
+      {rest.length > 0 && (
+        <>
+          {core.length > 0 && <h2 className="st-section">Apps</h2>}
+          <div className="st-catalog-grid">{rest.map(renderCard)}</div>
+        </>
+      )}
+    </>
   )
 }
 
