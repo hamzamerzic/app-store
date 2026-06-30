@@ -88,7 +88,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.5.0'
+const STORE_VERSION = '1.5.1'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -238,11 +238,11 @@ const CSS = `
   display: flex; align-items: center; gap: 12px;
 }
 .st-brand-icon {
-  width: 40px; height: 40px; border-radius: 9px;
+  width: 34px; height: 34px; border-radius: 9px;
   object-fit: cover; flex-shrink: 0; display: block;
 }
 .st-brand-fallback {
-  width: 40px; height: 40px; border-radius: 9px; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: var(--accent, currentColor); color: var(--bg, #0c0c0c);
   font-size: 22px; font-weight: 700; line-height: 1;
