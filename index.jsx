@@ -1951,16 +1951,16 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
                     {busy
                       ? 'Opening chat...'
                       : updateNotice.kind === 'conflict'
-                      ? 'Resolve in chat'
+                      ? 'Ask the agent to fix it'
                       : 'Review in chat'}
                   </button>
                   <button
                     type="button"
-                    className="st-danger-btn"
+                    className="st-btn st-btn-secondary"
                     onClick={onDismissNotice}
                     disabled={busy}
                   >
-                    Dismiss
+                    Not now
                   </button>
                 </div>
               </div>
@@ -2017,7 +2017,7 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
         >
           {busy
             ? (hasUpdate ? 'Updating…' : 'Installing…')
-            : blockedUpdate ? 'Resolve update'
+            : blockedUpdate ? 'Ask the agent to fix it'
             : hasUpdate ? `Update to v${m.version}`
             : storeInstalled ? 'Open App'
             : 'Install'}
@@ -2403,10 +2403,11 @@ export default function App({ appId, token }) {
 
       if (isConflict) {
         const name = result.name || item.manifest?.name || item.id
-        const paths = result.conflict_paths?.length
-          ? ` Conflicts: ${result.conflict_paths.join(', ')}.`
-          : ''
-        const message = `${name} update needs review before it can apply.${paths}`
+        // Friendly, non-alarming framing: the owner edited the app, and those
+        // edits overlap the new release so they can't be combined
+        // automatically. Offer the agent's help rather than surfacing raw
+        // conflict files (the resolver chat carries the file-level detail).
+        const message = `You've made edits to ${name} that can't be automatically combined with this update. Would you like the agent to reconcile them for you?`
         const notice = {
           kind: 'conflict',
           itemId: item.id,
