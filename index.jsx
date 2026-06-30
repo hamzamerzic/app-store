@@ -6,11 +6,15 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from
 // catalog always reflects the repo's current name/version/description.
 const CATALOG = [
   // Memory + Reflection are platform CORE apps (installed by
-  // install-core-apps and re-synced on every deploy), not store-installable.
-  // `core: true` surfaces them as "Built in" — discoverable + openable, but
-  // with no install / update / uninstall path, so there is no row to fork
-  // into a dup and no store update to fight the deploy re-sync.
-  // findInstalled() resolves them by slug (still 'memory' / 'reflection').
+  // install-core-apps), not store-INSTALLABLE — but they ARE store-UPDATABLE.
+  // `core: true` surfaces them under "Built in": discoverable, openable, and
+  // (when the published catalog version is newer than what's installed) an
+  // Update affordance — but NEVER an install or uninstall path, so a platform
+  // app can't be removed and there's no row to fork into a dup. The update
+  // keys on the app's manifest identity (findInstalled resolves them by slug,
+  // still 'memory' / 'reflection'), so the existing row is updated in place;
+  // install-core-apps SKIPS store-managed apps (manifest_url set), so the
+  // deploy re-sync won't fight a store update.
   {
     id: 'memory',
     repo: 'mobius-os/app-memory',
@@ -88,7 +92,7 @@ const CATALOG = [
 // manifest and, when that version is newer than what's running, offer a
 // one-tap update (the same install transaction every other app uses) followed
 // by a reload so the freshly-patched code loads.
-const STORE_VERSION = '1.5.1'
+const STORE_VERSION = '1.6.0'
 const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
@@ -1574,8 +1578,16 @@ function CatalogCard({ item, installed, installedVersions, onPick, onRetry, onUp
   // so the state is obvious before the user opens details.
   let statusLabel = 'Install'
   let cardVariant = 'default'
-  if (item.core) {
-    // Platform core app — always present, never store-installable.
+  if (item.core && hasUpdate) {
+    // Platform core app with a newer published version — updatable in place.
+    // It stays NON-uninstallable (see DetailView); the update keys on the
+    // app's manifest identity, so the backend updates the existing row (no
+    // dup), and install-core-apps skips store-managed apps so the deploy
+    // re-sync won't fight it.
+    statusLabel = 'Update'
+    cardVariant = 'update'
+  } else if (item.core) {
+    // Platform core app, up to date — always present, never uninstallable.
     statusLabel = 'Built in'
     cardVariant = 'installed'
   } else if (storeInstalled && hasUpdate) {
@@ -1832,11 +1844,14 @@ function DetailView({ item, installed, installedVersions, onBack, onInstall, onU
   // installed apps via manifest_url, never slug.
   const storeInstalled = findInstalled(installed, item)
   const installedVer = installedVersionFor(item, installedVersions, storeInstalled)
-  // Core apps (Reflection, Memory) are platform-managed: never offer install /
-  // update / uninstall, only Open. The deploy re-syncs them, so a store
-  // update would fight that — suppress the update affordance here.
+  // Core apps (Reflection, Memory) are platform-managed: never offer a fresh
+  // install or an uninstall (the Uninstall button below stays gated on
+  // !isCore, so a platform app can't be removed). They ARE updatable in place
+  // when the published version is newer — install-core-apps skips store-managed
+  // apps so a store update doesn't fight the deploy re-sync, and the backend
+  // updates the existing row by manifest identity (no dup).
   const isCore = !!item.core
-  const hasUpdate = !isCore && storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
+  const hasUpdate = storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0
   const blockedUpdate = updateNotice?.kind === 'conflict'
   const ca = m.permissions?.cross_app_access || 'none'
   const sw = m.permissions?.share_with_apps || 'none'
