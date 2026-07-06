@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "updated": "2026-07-03",
-  "note": "Web registry of Mobius App Store catalog entries. The store fetches this at mount (via the server proxy) so a new app appears in every instance's store the moment this file lands on main — no store-app redeploy. constants.js CATALOG is the baked fallback used only if this fetch fails; keep the two in sync. Each entry: { id, repo, manifest_url, raw_base, core? }. core:true = a platform app (updatable, never install/uninstall).",
+  "updated": "2026-07-06",
+  "note": "Web registry of Mobius App Store catalog entries. The store fetches this at mount (via the server proxy) so a new app appears in every instance's store the moment this file lands on main \u2014 no store-app redeploy. constants.js CATALOG is the baked fallback used only if this fetch fails; keep the two in sync. Each entry: { id, repo, manifest_url, raw_base, core? }. core:true = a platform app (updatable, never install/uninstall).",
   "apps": [
     {
       "id": "memory",
@@ -88,6 +88,12 @@
       "repo": "mobius-os/app-skills",
       "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-skills/main/mobius.json",
       "raw_base": "https://raw.githubusercontent.com/mobius-os/app-skills/main/"
+    },
+    {
+      "id": "contribute",
+      "repo": "mobius-os/app-contribute",
+      "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-contribute/main/mobius.json",
+      "raw_base": "https://raw.githubusercontent.com/mobius-os/app-contribute/main/"
     }
   ]
 }
