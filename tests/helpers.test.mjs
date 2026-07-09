@@ -96,6 +96,30 @@ test('fetchManifest retries transient manifest failures', async () => {
   }
 })
 
+test('fetchManifest retries transient network errors with a friendly message', async () => {
+  const oldFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async (_url, _opts) => {
+    calls += 1
+    if (calls === 1) throw new TypeError('Failed to fetch')
+    return new Response(JSON.stringify({ id: 'notes', version: '1.0.0' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  try {
+    const { fetchManifest } = await bundle()
+    const manifest = await fetchManifest('https://example.test/mobius.json', 'tok', {
+      retries: 1,
+      retryDelayMs: 0,
+    })
+    assert.equal(calls, 2)
+    assert.deepEqual(manifest, { id: 'notes', version: '1.0.0' })
+  } finally {
+    globalThis.fetch = oldFetch
+  }
+})
+
 test('fetchManifest does not rapidly retry upstream rate limits', async () => {
   const oldFetch = globalThis.fetch
   let calls = 0
@@ -121,15 +145,31 @@ test('fetchManifest does not rapidly retry upstream rate limits', async () => {
   }
 })
 
-test('fetchCatalog preserves valid embedded manifests only', async () => {
+test('fetchCatalog retries transient failures and preserves app metadata', async () => {
   const oldFetch = globalThis.fetch
-  globalThis.fetch = async (_url, _opts) => new Response(JSON.stringify({
+  let calls = 0
+  globalThis.fetch = async (_url, _opts) => {
+    calls += 1
+    if (calls === 1) {
+      return new Response('temporarily unavailable', { status: 503 })
+    }
+    return new Response(JSON.stringify({
     apps: [
       {
         id: 'notes',
         repo: 'mobius-os/app-notes',
         manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
         raw_base: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/',
+        categories: ['productivity', 'writing', 'writing'],
+        keywords: ['notes', 'markdown'],
+        capabilities: ['write markdown notes'],
+        setup: {
+          required: true,
+          scope: 'app',
+          label: 'Notes setup',
+          description: 'Configure notes.',
+          fields: ['theme'],
+        },
         manifest: {
           id: 'notes',
           name: 'Notes',
@@ -145,14 +185,30 @@ test('fetchCatalog preserves valid embedded manifests only', async () => {
         manifest: { id: 'bad-snapshot', name: 'Bad' },
       },
     ],
-  }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
   try {
     const { fetchCatalog } = await bundle()
-    const entries = await fetchCatalog('https://example.test/catalog.json', 'tok')
+    const entries = await fetchCatalog('https://example.test/catalog.json', 'tok', {
+      retries: 1,
+      retryDelayMs: 0,
+    })
+    assert.equal(calls, 2)
     assert.equal(entries.length, 2)
+    assert.deepEqual(entries[0].categories, ['productivity', 'writing'])
+    assert.deepEqual(entries[0].keywords, ['notes', 'markdown'])
+    assert.deepEqual(entries[0].capabilities, ['write markdown notes'])
+    assert.deepEqual(entries[0].setup, {
+      required: true,
+      scope: 'app',
+      label: 'Notes setup',
+      description: 'Configure notes.',
+      action: 'Open app settings',
+      fields: ['theme'],
+    })
     assert.deepEqual(entries[0].manifest, {
       id: 'notes',
       name: 'Notes',
@@ -164,6 +220,29 @@ test('fetchCatalog preserves valid embedded manifests only', async () => {
   } finally {
     globalThis.fetch = oldFetch
   }
+})
+
+test('filterCatalog matches categories, descriptions, and setup metadata', async () => {
+  const { collectCategories, filterCatalog } = await bundle()
+  const items = [
+    {
+      id: 'news',
+      categories: ['information', 'agents'],
+      keywords: ['digest'],
+      setup: { description: 'Choose the fallback model.' },
+      manifest: { name: 'News', description: 'Daily digest' },
+    },
+    {
+      id: 'atlas',
+      categories: ['reference'],
+      keywords: ['globe'],
+      manifest: { name: 'Atlas', description: 'Explore Earth' },
+    },
+  ]
+  assert.deepEqual(collectCategories(items), ['information', 'agents', 'reference'])
+  assert.deepEqual(filterCatalog(items, { category: 'agents' }).map(i => i.id), ['news'])
+  assert.deepEqual(filterCatalog(items, { query: 'fallback model' }).map(i => i.id), ['news'])
+  assert.deepEqual(filterCatalog(items, { query: 'earth', category: 'reference' }).map(i => i.id), ['atlas'])
 })
 
 test('scheduleSummary handles cron and on-demand jobs', async () => {

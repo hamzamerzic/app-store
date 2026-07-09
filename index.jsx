@@ -12,12 +12,14 @@
 //
 // Only App lives here: it owns top-level catalog/install/navigation state and
 // mounts the browse grid, From URL tab, detail view, modal, banner, and toast.
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { CATALOG, CATALOG_URL } from './constants.js'
 import { CSS } from './theme.js'
 import {
   buildCleanMergeReviewMessage,
   canonicalIdentityKey,
+  collectCategories,
+  filterCatalog,
   findInstalled,
 } from './domain.js'
 import {
@@ -34,6 +36,7 @@ import {
 } from './api.js'
 import { loadInstalledVersions, saveInstalledVersions } from './storage.js'
 import { CatalogList } from './ui/CatalogList.jsx'
+import { CatalogFilters } from './ui/CatalogFilters.jsx'
 import { CatalogSkeleton } from './ui/CatalogSkeleton.jsx'
 import { DetailView } from './ui/DetailView.jsx'
 import { FromUrlTab } from './ui/FromUrlTab.jsx'
@@ -42,6 +45,8 @@ import { UninstallConfirmModal } from './ui/UninstallConfirmModal.jsx'
 
 export {
   canonicalIdentityKey,
+  collectCategories,
+  filterCatalog,
   findInstalled,
   humanCron,
   isTrustedHost,
@@ -74,6 +79,8 @@ async function mapWithConcurrency(items, limit, mapper) {
 
 export default function App({ appId, token }) {
   const [tab, setTab] = useState('browse')
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('all')
   const [catalog, setCatalog] = useState(() =>
     CATALOG.map(c => ({ ...c, manifest: c.manifest || null, error: null }))
   )
@@ -678,6 +685,12 @@ export default function App({ appId, token }) {
     document.getElementById(next === 'browse' ? 'st-tab-browse' : 'st-tab-url')?.focus()
   }
 
+  const categories = useMemo(() => collectCategories(catalog), [catalog])
+  const visibleCatalog = useMemo(
+    () => filterCatalog(catalog, { query, category }),
+    [catalog, query, category],
+  )
+
   // Detail view replaces the main layout when set.
   if (detail) {
     return (
@@ -768,21 +781,34 @@ export default function App({ appId, token }) {
             <SelfUpdateBanner appId={appId} token={token} />
             {loadingCatalog
               ? <CatalogSkeleton count={CATALOG.length} />
-              : <CatalogList
-                  items={catalog}
-                  installed={installed}
-                  installedVersions={installedVersions}
-                  onPick={(item) => item.manifest && openDetail(item)}
-                  onRetry={retryCatalogItem}
-                  onUpdate={handleInstall}
-                  busy={busy}
-                  busyItemId={busyItemId}
-                  errors={cardErrors}
-                  updateNotice={updateNotice}
-                  onReviewUpdate={handleReviewUpdate}
-                  onDismissNotice={handleDismissNotice}
-                  token={token}
-                />}
+              : <>
+                  <CatalogFilters
+                    query={query}
+                    category={category}
+                    categories={categories}
+                    totalCount={catalog.length}
+                    resultCount={visibleCatalog.length}
+                    onQueryChange={setQuery}
+                    onCategoryChange={setCategory}
+                  />
+                  <CatalogList
+                    items={visibleCatalog}
+                    installed={installed}
+                    installedVersions={installedVersions}
+                    onPick={(item) => item.manifest && openDetail(item)}
+                    onRetry={retryCatalogItem}
+                    onUpdate={handleInstall}
+                    busy={busy}
+                    busyItemId={busyItemId}
+                    errors={cardErrors}
+                    updateNotice={updateNotice}
+                    onReviewUpdate={handleReviewUpdate}
+                    onDismissNotice={handleDismissNotice}
+                    token={token}
+                    emptyTitle="No matches"
+                    emptyText="Try a different search or category."
+                  />
+                </>}
           </>
         )}
         {tab === 'url' && (

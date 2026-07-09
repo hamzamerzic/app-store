@@ -112,6 +112,103 @@ export const CSS = `
 .st-tabs { display: flex; flex: 1; min-width: 0; gap: 4px; border-radius: 10px; }
 .st-tabs .st-seg-btn { flex: 1; min-width: 0; }
 
+/* Discovery controls: compact search + category chips. This is an
+   operational filter surface, not a hero — it sits in-flow above the grid and
+   keeps the direct install/update card actions visible. */
+.st-discovery {
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.st-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.st-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.st-search-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms, background 150ms;
+}
+.st-search-input::placeholder { color: color-mix(in srgb, var(--muted) 88%, var(--text)); }
+.st-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.st-result-count {
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-family: var(--mono, monospace);
+}
+.st-category-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  overflow: visible;
+  padding-bottom: 1px;
+}
+.st-category-strip::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.st-chip {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  transition: background 150ms, border-color 150ms, color 150ms;
+}
+.st-chip.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+@media (hover: hover) {
+  .st-chip:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+}
+
+@media (max-width: 720px) {
+  .st-category-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-right: -16px;
+    padding-right: 16px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
 /* App-specific catalog grid + tiles. The vertical-tile card diverges
    structurally from the canonical horizontal list Card, so it keeps the
    store's own values + class names. State rides is-* modifier classes. */
@@ -238,7 +335,7 @@ export const CSS = `
 .st-card-version {
   font-size: 12px; color: var(--muted);
   font-family: var(--mono, monospace);
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   display: flex; align-items: center; gap: 6px;
 }
 .st-card-agent {
@@ -249,13 +346,40 @@ export const CSS = `
   border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
   border-radius: 999px; padding: 1px 7px;
 }
+.st-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  min-height: 22px;
+  margin: 0 0 8px;
+}
+.st-card-badge {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--border));
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-card-badge.is-setup {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
 .st-card-desc {
   font-size: 12px; color: var(--muted); line-height: 1.35;
   margin-bottom: 12px;
-  display: -webkit-box; -webkit-line-clamp: 3;
+  display: -webkit-box; -webkit-line-clamp: 2;
   -webkit-box-orient: vertical; overflow: hidden;
   text-align: center;
-  min-height: 48px;
+  min-height: 33px;
 }
 /* Top-border separator between the description and the one card action.
    Each card reads as exactly one state/action: Install, Installed, or Update.
@@ -539,6 +663,26 @@ export const CSS = `
 }
 .st-schedule-main { font-weight: 600; color: var(--text); }
 .st-schedule-note { color: var(--muted); margin-top: 4px; font-size: 12px; }
+.st-setup-card {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.st-setup-main { font-weight: 650; color: var(--text); }
+.st-setup-note { color: var(--muted); margin-top: 4px; }
+.st-setup-meta {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+}
 /* External-libs disclosure — a quiet note on a muted surface, dep list
    mono-formatted (not an alarming panel). */
 .st-esm-note {
@@ -730,6 +874,7 @@ export const CSS = `
   .st-scroll > .st-catalog-grid,
   .st-scroll > .st-empty,
   .st-scroll > .st-banner,
+  .st-scroll > .st-discovery,
   .st-scroll > .st-url-form,
   .st-scroll > .st-hero,
   .st-scroll > .st-detail-desc,

@@ -33,6 +33,7 @@ export function DetailView({ item, installed, installedVersions, onBack, onInsta
     try { warnHost = new URL(item.manifest_url).hostname } catch { warnHost = item.manifest_url }
   }
   const scheduleText = scheduleSummary(m.schedule)
+  const setup = item.setup?.required ? item.setup : null
 
   // When the app is installed, serve the raw transparent icon from the
   // same-origin API route rather than the external catalog source. Avoids the
@@ -90,6 +91,23 @@ export function DetailView({ item, installed, installedVersions, onBack, onInsta
                   Time is configurable from the app's settings after install.
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {setup && (
+          <div className="st-detail-section">
+            <div className="st-section-label">Setup</div>
+            <div className="st-setup-card">
+              <div className="st-setup-main">
+                {setup.label || (setup.scope === 'system' ? 'System setup required' : 'Setup required')}
+              </div>
+              {setup.description && (
+                <div className="st-setup-note">{setup.description}</div>
+              )}
+              <div className="st-setup-meta">
+                {setup.scope === 'system' ? 'Configure from Möbius Settings' : 'Configure inside the app'}
+              </div>
             </div>
           </div>
         )}

@@ -5,6 +5,7 @@ export function useState(initial) { return [initial, () => {}] }
 export function useEffect() {}
 export function useLayoutEffect() {}
 export function useCallback(fn) { return fn }
+export function useMemo(fn) { return fn() }
 export function useRef(initial) { return { current: initial } }
 
 export default {
@@ -15,5 +16,6 @@ export default {
   useEffect,
   useLayoutEffect,
   useCallback,
+  useMemo,
   useRef,
 }

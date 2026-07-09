@@ -1,4 +1,4 @@
-import { findInstalled, installedVersionFor, semverCmp } from '../domain.js'
+import { categoryLabel, findInstalled, installedVersionFor, itemCategories, semverCmp } from '../domain.js'
 import { IconBox } from './IconBox.jsx'
 
 function cardVariantClass(variant) {
@@ -116,6 +116,8 @@ export function CatalogCard({ item, installed, installedVersions, onPick, onRetr
   const itemWithIcon = storeInstalled
     ? { ...item, installed_icon_url: `/api/apps/${storeInstalled.id}/icon` }
     : item
+  const badges = itemCategories(item).slice(0, 1)
+  const needsSetup = item.setup?.required === true
 
   // The card is a non-interactive container. Two cleanly-separated AT
   // targets sit inside it: the app name is a real <button> whose ::after
@@ -149,8 +151,22 @@ export function CatalogCard({ item, installed, installedVersions, onPick, onRetr
           <span className="st-card-agent" title="This app has a built-in agent">agent</span>
         ) : null}
       </div>
+      {(badges.length > 0 || needsSetup) && (
+        <div className="st-card-badges">
+          {badges.map((badge) => (
+            <span key={badge} className="st-card-badge">
+              {categoryLabel(badge)}
+            </span>
+          ))}
+          {needsSetup && (
+            <span className="st-card-badge is-setup">
+              Setup
+            </span>
+          )}
+        </div>
+      )}
       {m.description ? (
-        <div className="st-card-desc">{m.description}</div>
+        <div className="st-card-desc" title={m.description}>{m.description}</div>
       ) : null}
       <div className="st-card-status-row">
         <button

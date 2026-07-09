@@ -102,6 +102,71 @@ export function scheduleSummary(schedule) {
   if (schedule.job) return 'Runs on demand from inside the app'
   return ''
 }
+
+export function itemCategories(item) {
+  return Array.isArray(item?.categories)
+    ? item.categories.filter((c) => typeof c === 'string' && c.trim())
+    : []
+}
+
+export function categoryLabel(category) {
+  const value = String(category || '').trim()
+  if (!value) return ''
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export function collectCategories(items) {
+  const seen = new Set()
+  const out = []
+  for (const item of items || []) {
+    for (const category of itemCategories(item)) {
+      const key = category.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(category)
+    }
+  }
+  return out
+}
+
+export function catalogSearchText(item) {
+  const m = item?.manifest || {}
+  return [
+    item?.id,
+    item?.repo,
+    m.id,
+    m.name,
+    m.description,
+    m.author,
+    ...(Array.isArray(item?.categories) ? item.categories : []),
+    ...(Array.isArray(item?.keywords) ? item.keywords : []),
+    ...(Array.isArray(item?.capabilities) ? item.capabilities : []),
+    item?.setup?.label,
+    item?.setup?.description,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+
+export function filterCatalog(items, { query = '', category = 'all' } = {}) {
+  const terms = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const activeCategory = String(category || 'all').toLowerCase()
+  return (items || []).filter((item) => {
+    if (activeCategory !== 'all') {
+      const categories = itemCategories(item).map(c => c.toLowerCase())
+      if (!categories.includes(activeCategory)) return false
+    }
+    if (!terms.length) return true
+    const text = catalogSearchText(item)
+    return terms.every(term => text.includes(term))
+  })
+}
+
 export function semverCmp(a, b) {
   if (!a || !b) return 0
   const core = (v) => String(v).split('+')[0].split('-')[0]
