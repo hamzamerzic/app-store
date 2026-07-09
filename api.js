@@ -33,14 +33,41 @@ export function proxyUrl(extUrl) {
   return `/api/proxy?url=${encodeURIComponent(extUrl)}`
 }
 
-export async function fetchManifest(url, token) {
+function retryableFetchStatus(status) {
+  return status === 408 || status === 429 || (status >= 500 && status < 600)
+}
+
+function retryDelay(res, attempt, fallbackMs) {
+  const retryAfter = Number(res.headers?.get?.('retry-after'))
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, 5000)
+  }
+  return fallbackMs * (attempt + 1)
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export async function fetchManifest(url, token, opts = {}) {
   const manifestUrl = validateManifestUrl(url)
-  const r = await fetch(proxyUrl(manifestUrl), {
-    cache: 'no-cache',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-  if (!r.ok) throw new Error(`Manifest fetch failed: ${r.status}`)
-  return await r.json()
+  const retries = opts.retries ?? 2
+  const delayMs = opts.retryDelayMs ?? 350
+  let lastError = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const r = await fetch(proxyUrl(manifestUrl), {
+      cache: 'no-cache',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (r.ok) return await r.json()
+
+    lastError = new Error(`Manifest fetch failed: ${r.status}`)
+    if (!retryableFetchStatus(r.status) || attempt === retries) break
+    await sleep(retryDelay(r, attempt, delayMs))
+  }
+
+  throw lastError || new Error('Manifest fetch failed')
 }
 
 // Fetch the web registry (catalog.json) via the proxy and return a validated

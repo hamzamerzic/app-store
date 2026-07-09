@@ -51,6 +51,26 @@ export {
 } from './domain.js'
 export { STORE_VERSION } from './constants.js'
 export { normalizeInstalledVersions } from './storage.js'
+export { fetchManifest, proxyUrl } from './api.js'
+
+const MANIFEST_FETCH_CONCURRENCY = 3
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const out = new Array(items.length)
+  let next = 0
+  const workers = Array.from(
+    { length: Math.min(Math.max(limit, 1), items.length) },
+    async () => {
+      while (next < items.length) {
+        const i = next
+        next += 1
+        out[i] = await mapper(items[i], i)
+      }
+    },
+  )
+  await Promise.all(workers)
+  return out
+}
 
 export default function App({ appId, token }) {
   const [tab, setTab] = useState('browse')
@@ -148,15 +168,17 @@ export default function App({ appId, token }) {
         }
         if (cancelled) return
         // Hydrate each catalog entry.
-        const hydrated = await Promise.all(
-          entries.map(async (c) => {
+        const hydrated = await mapWithConcurrency(
+          entries,
+          MANIFEST_FETCH_CONCURRENCY,
+          async (c) => {
             try {
               const manifest = await fetchManifest(c.manifest_url, token)
               return { ...c, manifest, error: null }
             } catch (e) {
               return { ...c, manifest: null, error: e.message || String(e) }
             }
-          })
+          },
         )
         if (cancelled) return
         setCatalog(hydrated)
@@ -230,8 +252,10 @@ export default function App({ appId, token }) {
     }
     manifestRehydratingRef.current = true
     try {
-      const refetched = await Promise.all(
-        targets.map(async (c) => {
+      const refetched = await mapWithConcurrency(
+        targets,
+        MANIFEST_FETCH_CONCURRENCY,
+        async (c) => {
           try {
             const manifest = await fetchManifest(c.manifest_url, token)
             return { id: c.id, manifest }
@@ -240,7 +264,7 @@ export default function App({ appId, token }) {
             // a stale-but-present manifest is better than blanking the card.
             return null
           }
-        })
+        },
       )
       const byId = new Map(refetched.filter(Boolean).map(r => [r.id, r.manifest]))
       if (byId.size > 0) {

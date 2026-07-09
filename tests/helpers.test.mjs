@@ -70,6 +70,32 @@ test('validateManifestUrl only accepts http(s) manifest URLs', async () => {
   assert.throws(() => validateManifestUrl('/mobius.json'), /valid/)
 })
 
+test('fetchManifest retries transient manifest failures', async () => {
+  const oldFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async (_url, _opts) => {
+    calls += 1
+    if (calls === 1) {
+      return new Response('rate limited', { status: 429 })
+    }
+    return new Response(JSON.stringify({ id: 'notes', version: '1.0.0' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  try {
+    const { fetchManifest } = await bundle()
+    const manifest = await fetchManifest('https://example.test/mobius.json', 'tok', {
+      retries: 1,
+      retryDelayMs: 0,
+    })
+    assert.equal(calls, 2)
+    assert.deepEqual(manifest, { id: 'notes', version: '1.0.0' })
+  } finally {
+    globalThis.fetch = oldFetch
+  }
+})
+
 test('scheduleSummary handles cron and on-demand jobs', async () => {
   const { scheduleSummary } = await bundle()
 
