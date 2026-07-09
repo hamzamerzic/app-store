@@ -870,6 +870,22 @@ export const CSS = `
    comfortably sized and intentional on wide screens. The grid floor also
    bumps so cards don't get over-dense. */
 @media (min-width: 720px) {
+  .st-title-row {
+    position: relative;
+    max-width: 840px;
+    margin-inline: auto;
+  }
+  .st-brand-icon,
+  .st-brand-fallback {
+    position: absolute;
+    left: -46px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .st-tabs {
+    flex: 0 0 auto;
+    width: 100%;
+  }
   .st-scroll > .st-section,
   .st-scroll > .st-catalog-grid,
   .st-scroll > .st-empty,
