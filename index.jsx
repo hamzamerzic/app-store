@@ -18,9 +18,10 @@ import { CSS } from './theme.js'
 import {
   buildCleanMergeReviewMessage,
   canonicalIdentityKey,
-  collectCategories,
   filterCatalog,
   findInstalled,
+  installedVersionFor,
+  semverCmp,
 } from './domain.js'
 import {
   createAppChat,
@@ -59,6 +60,14 @@ export { normalizeInstalledVersions } from './storage.js'
 export { fetchCatalog, fetchManifest, proxyUrl } from './api.js'
 
 const MANIFEST_FETCH_CONCURRENCY = 3
+
+function hasPendingCatalogUpdate(item, installed, installedVersions) {
+  const m = item?.manifest
+  if (!m?.version) return false
+  const storeInstalled = findInstalled(installed, item)
+  const installedVer = installedVersionFor(item, installedVersions, storeInstalled)
+  return !!(storeInstalled && installedVer && semverCmp(installedVer, m.version) < 0)
+}
 
 async function mapWithConcurrency(items, limit, mapper) {
   const out = new Array(items.length)
@@ -685,11 +694,12 @@ export default function App({ appId, token }) {
     document.getElementById(next === 'browse' ? 'st-tab-browse' : 'st-tab-url')?.focus()
   }
 
-  const categories = useMemo(() => collectCategories(catalog), [catalog])
-  const visibleCatalog = useMemo(
-    () => filterCatalog(catalog, { query, category }),
-    [catalog, query, category],
-  )
+  const visibleCatalog = useMemo(() => {
+    const catalogCategory = category === 'system' ? 'system' : 'all'
+    const matches = filterCatalog(catalog, { query, category: catalogCategory })
+    if (category !== 'updates-pending') return matches
+    return matches.filter((item) => hasPendingCatalogUpdate(item, installed, installedVersions))
+  }, [catalog, query, category, installed, installedVersions])
 
   // Detail view replaces the main layout when set.
   if (detail) {
@@ -785,7 +795,6 @@ export default function App({ appId, token }) {
                   <CatalogFilters
                     query={query}
                     category={category}
-                    categories={categories}
                     totalCount={catalog.length}
                     resultCount={visibleCatalog.length}
                     onQueryChange={setQuery}
@@ -806,7 +815,7 @@ export default function App({ appId, token }) {
                     onDismissNotice={handleDismissNotice}
                     token={token}
                     emptyTitle="No matches"
-                    emptyText="Try a different search or category."
+                    emptyText="Try a different search or filter."
                   />
                 </>}
           </>

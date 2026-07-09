@@ -1,9 +1,11 @@
-import { categoryLabel } from '../domain.js'
+const FILTERS = [
+  { id: 'system', label: 'System' },
+  { id: 'updates-pending', label: 'Updates pending' },
+]
 
 export function CatalogFilters({
   query,
   category,
-  categories,
   totalCount,
   resultCount,
   onQueryChange,
@@ -30,22 +32,16 @@ export function CatalogFilters({
           {resultCount}/{totalCount}
         </div>
       </div>
-      <div className="st-category-strip" aria-label="Catalog categories">
-        <button
-          type="button"
-          className={`st-chip${selected === 'all' ? ' is-active' : ''}`}
-          onClick={() => onCategoryChange('all')}
-        >
-          All
-        </button>
-        {categories.map((c) => (
+      <div className="st-category-strip" aria-label="Catalog filters">
+        {FILTERS.map((filter) => (
           <button
-            key={c}
+            key={filter.id}
             type="button"
-            className={`st-chip${selected === c ? ' is-active' : ''}`}
-            onClick={() => onCategoryChange(c)}
+            className={`st-chip${selected === filter.id ? ' is-active' : ''}`}
+            aria-pressed={selected === filter.id}
+            onClick={() => onCategoryChange(selected === filter.id ? 'all' : filter.id)}
           >
-            {categoryLabel(c)}
+            {filter.label}
           </button>
         ))}
       </div>

@@ -116,7 +116,7 @@ export function CatalogCard({ item, installed, installedVersions, onPick, onRetr
   const itemWithIcon = storeInstalled
     ? { ...item, installed_icon_url: `/api/apps/${storeInstalled.id}/icon` }
     : item
-  const badges = itemCategories(item).slice(0, 1)
+  const badges = itemCategories(item).filter((badge) => badge.toLowerCase() === 'system').slice(0, 1)
   const needsSetup = item.setup?.required === true
 
   // The card is a non-interactive container. Two cleanly-separated AT

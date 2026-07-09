@@ -43,8 +43,7 @@
         }
       },
       "categories": [
-        "system",
-        "developer"
+        "system"
       ],
       "keywords": [
         "skills",
@@ -96,10 +95,7 @@
           "execution": "none"
         }
       },
-      "categories": [
-        "productivity",
-        "planning"
-      ],
+      "categories": [],
       "keywords": [
         "tasks",
         "todo",
@@ -170,10 +166,7 @@
           "ui/Feed.jsx"
         ]
       },
-      "categories": [
-        "developer",
-        "publishing"
-      ],
+      "categories": [],
       "keywords": [
         "contribute",
         "github",
@@ -254,10 +247,7 @@
           "job": "job.sh"
         }
       },
-      "categories": [
-        "productivity",
-        "writing"
-      ],
+      "categories": [],
       "keywords": [
         "notes",
         "markdown",
@@ -336,10 +326,7 @@
           "esm_deps": []
         }
       },
-      "categories": [
-        "information",
-        "agents"
-      ],
+      "categories": [],
       "keywords": [
         "news",
         "daily digest",
@@ -422,8 +409,7 @@
         ]
       },
       "categories": [
-        "system",
-        "knowledge"
+        "system"
       ],
       "keywords": [
         "memory graph",
@@ -513,8 +499,7 @@
         ]
       },
       "categories": [
-        "system",
-        "agents"
+        "system"
       ],
       "keywords": [
         "reflection",
@@ -599,10 +584,7 @@
           "esm_deps": []
         }
       },
-      "categories": [
-        "developer",
-        "writing"
-      ],
+      "categories": [],
       "keywords": [
         "editor",
         "code",
@@ -710,10 +692,7 @@
           "seeds/files/app.js"
         ]
       },
-      "categories": [
-        "developer",
-        "creative"
-      ],
+      "categories": [],
       "keywords": [
         "webstudio",
         "website",
@@ -789,10 +768,7 @@
         "storage_seeds": {},
         "embeds_agent": true
       },
-      "categories": [
-        "health",
-        "tracking"
-      ],
+      "categories": [],
       "keywords": [
         "workout",
         "gym",
@@ -858,10 +834,7 @@
         },
         "embeds_agent": false
       },
-      "categories": [
-        "health",
-        "tracking"
-      ],
+      "categories": [],
       "keywords": [
         "habits",
         "streaks",
@@ -929,10 +902,7 @@
           "ui/SyncPill.jsx"
         ]
       },
-      "categories": [
-        "reference",
-        "visual"
-      ],
+      "categories": [],
       "keywords": [
         "atlas",
         "map",
@@ -1029,10 +999,7 @@
         },
         "embeds_agent": true
       },
-      "categories": [
-        "writing",
-        "documents"
-      ],
+      "categories": [],
       "keywords": [
         "latex",
         "pdf",
@@ -1055,13 +1022,13 @@
       "manifest": {
         "id": "tandem",
         "name": "Tandem",
-        "version": "0.12.6",
+        "version": "0.12.7",
         "description": "Split-pane bilingual reader for language learning. Top and bottom panes show each language independently with sync-scroll; drag the slim divider to resize. Choose languages and level, then describe the story you want in one free-form prompt — ask for a fresh story or to continue an earlier one (the generation agent loads the relevant stories itself). Pick the generation agent (Claude or OpenAI Codex) in settings; tap any word to highlight it, its sentence, and its translation inline in both panes.",
         "offline_capable": true,
         "author": "mobius-os",
         "license": "MIT",
         "homepage": "https://github.com/mobius-os/app-tandem",
-        "icon": "icon.png",
+        "icon": "icon-v5.png",
         "entry": "index.jsx",
         "source_files": [
           "story-schema.mjs",
@@ -1069,9 +1036,11 @@
           "gen-model.mjs",
           "scroll-sync.mjs",
           "constants.js",
+          "signals.js",
           "theme.js",
           "storage.js",
           "ui/useModalFocus.js",
+          "ui/useShellBackTarget.js",
           "ui/Icons.jsx",
           "ui/ParaText.jsx",
           "ui/StoryReader.jsx",
@@ -1101,10 +1070,7 @@
           "esm_deps": []
         }
       },
-      "categories": [
-        "learning",
-        "agents"
-      ],
+      "categories": [],
       "keywords": [
         "language",
         "reader",
@@ -1198,9 +1164,7 @@
           "esm_deps": []
         }
       },
-      "categories": [
-        "games"
-      ],
+      "categories": [],
       "keywords": [
         "game",
         "runner",
