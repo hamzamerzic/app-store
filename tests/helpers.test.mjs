@@ -475,32 +475,34 @@ test('STORE_VERSION stays in lockstep with mobius.json', async () => {
   assert.equal(STORE_VERSION, manifest.version)
 })
 
-async function assertCatalogSnapshotMatchesLocal(id, repoDir) {
+// catalog.json is a pure discovery index (70d0c82): each app repo's own
+// mobius.json is the sole manifest source, hydrated live by the store, so
+// entries must never re-grow version-coupled `manifest` snapshots — that shape
+// forced a catalog bump on every app release and could serve stale versions.
+test('catalog is a pure discovery index — no manifest snapshots', async () => {
   const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
-  const localManifest = JSON.parse(
-    await readFile(join(root, '..', '..', repoDir, 'mobius.json'), 'utf8'),
-  )
-  const entry = catalog.apps.find((item) => item.id === id)
-
-  assert.ok(entry, `catalog contains ${id}`)
-  assert.deepEqual(entry.manifest.source_files, localManifest.source_files)
-  assert.equal(entry.manifest.version, localManifest.version)
-  assert.equal(entry.manifest.schedule?.job, localManifest.schedule?.job)
-}
-
-test('catalog snapshots match key app manifests', async () => {
-  await assertCatalogSnapshotMatchesLocal('memory', 'app-memory')
-  await assertCatalogSnapshotMatchesLocal('reflection', 'app-reflection')
-  await assertCatalogSnapshotMatchesLocal('contribute', 'app-contribute')
+  assert.ok(Array.isArray(catalog.apps) && catalog.apps.length > 0)
+  for (const entry of catalog.apps) {
+    assert.equal(entry.manifest, undefined,
+      `${entry.id}: manifest snapshots are retired — bump the app repo's mobius.json instead`)
+    assert.match(entry.id, /^[a-z0-9-]+$/)
+    assert.ok(entry.name, `${entry.id}: discovery entries carry a name`)
+    assert.ok(entry.description, `${entry.id}: discovery entries carry a description`)
+    assert.match(entry.manifest_url, /^https:\/\//)
+    assert.match(entry.raw_base, /^https:\/\//)
+    // The manifest is what the user reviews and trusts on install, so the
+    // source + icon files it pulls must come from the SAME origin.
+    assert.equal(new URL(entry.manifest_url).host, new URL(entry.raw_base).host,
+      `${entry.id}: raw_base must share manifest_url's host`)
+  }
 })
 
-test('Beat Machine catalog snapshot matches the sequencer manifest', async () => {
-  await assertCatalogSnapshotMatchesLocal('beat-machine', 'app-beat-machine')
+test('Beat Machine discovery entry describes the sequencer', async () => {
   const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
   const entry = catalog.apps.find((item) => item.id === 'beat-machine')
 
   assert.ok(entry, 'catalog contains Beat Machine')
-  assert.match(entry.manifest.description, /32-step sequencer/i)
+  assert.match(entry.description, /32-step sequencer/i)
   assert.ok(entry.keywords.includes('sequencer'))
   assert.ok(entry.capabilities.some((capability) => /32-step/.test(capability)))
 })
