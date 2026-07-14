@@ -505,12 +505,22 @@ test('catalog updates use a fresh capability guard without a second tap', async 
   assert.ok(indexSource.includes('const handleCatalogUpdate = useCallback'))
   assert.ok(indexSource.includes('onUpdate={handleCatalogUpdate}'))
   assert.ok(indexSource.includes('capabilityDigest: preview.capability_digest'))
+  assert.ok(indexSource.includes('capabilityDiffNeedsReview(preview.capability_diff)'))
   assert.ok(indexSource.includes('reviewed_capability_digest: _opts.capabilityDigest'))
   assert.ok(detailSource.includes('<CapabilityContract'))
   assert.ok(detailSource.includes('capabilityReview.preview.capability_digest'))
   assert.ok(cardSource.includes("? 'Update'"))
   assert.match(uninstallSource, /kept\s+temporarily for recovery/)
   assert.match(uninstallSource, /shared files.*not erased/)
+})
+
+test('one-tap updates stop for changed or unknown capabilities', async () => {
+  const { capabilityDiffNeedsReview } = await bundle()
+  assert.equal(capabilityDiffNeedsReview(null), true)
+  assert.equal(capabilityDiffNeedsReview({ unknown_previous: true, added: [], removed: [], changed: [] }), true)
+  assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: ['data.manage_apps'], removed: [], changed: [] }), true)
+  assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: [], removed: [], changed: ['background.agent'] }), true)
+  assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: [], removed: [], changed: [] }), false)
 })
 
 test('filterCatalog matches categories, descriptions, and setup metadata', async () => {

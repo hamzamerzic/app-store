@@ -19,6 +19,7 @@ import {
   buildCleanMergeReviewMessage,
   appLifecycleFor,
   busyLabelForAction,
+  capabilityDiffNeedsReview,
   canonicalIdentityKey,
   collectCategories,
   filterCatalog,
@@ -61,6 +62,7 @@ import { UninstallConfirmModal } from './ui/UninstallConfirmModal.jsx'
 export {
   appLifecycleFor,
   busyLabelForAction,
+  capabilityDiffNeedsReview,
   canonicalIdentityKey,
   collectCategories,
   filterCatalog,
@@ -919,10 +921,12 @@ export default function App({ appId, token }) {
 
   // The grid action used to open DetailView so the owner could manually review
   // access before updating. That made a routine update two taps. Updates are
-  // now direct again: fetch a fresh server-derived digest at click time, then
-  // pass it to the same guarded installer DetailView uses. If the release
-  // changes in the tiny interval between preview and install, the backend
-  // rejects it with capability_changed and shows the new review instead.
+  // now direct again when access is unchanged: fetch a fresh server-derived
+  // contract at click time and pass its digest to the guarded installer. A
+  // changed or previously-unknown contract still opens the detail review; the
+  // owner must explicitly accept new access. If the release changes in the
+  // tiny interval between preview and install, the backend rejects it with
+  // capability_changed and shows the new review instead.
   const handleCatalogUpdate = useCallback(async (item, opts = {}) => {
     if (!opts.isUpdate) {
       openDetail(item)
@@ -943,6 +947,18 @@ export default function App({ appId, token }) {
         ...prev,
         [item.id]: { status: 'ready', preview, error: '' },
       }))
+      if (capabilityDiffNeedsReview(preview.capability_diff)) {
+        setCapabilityReviews(prev => ({
+          ...prev,
+          [item.id]: { status: 'changed', preview, error: '' },
+        }))
+        await openDetail(item)
+        setToast({
+          kind: 'error',
+          message: 'This update changes app access. Review the current access before updating.',
+        })
+        return
+      }
       await handleInstall(item, {
         isUpdate: true,
         capabilityDigest: preview.capability_digest,

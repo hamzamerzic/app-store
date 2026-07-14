@@ -131,6 +131,14 @@ export function busyLabelForAction(actionKind) {
   return 'Installing…'
 }
 
+export function capabilityDiffNeedsReview(diff) {
+  if (!diff || typeof diff !== 'object') return true
+  if (diff.unknown_previous === true) return true
+  return ['added', 'removed', 'changed'].some(
+    (key) => Array.isArray(diff[key]) && diff[key].length > 0,
+  )
+}
+
 export function appLifecycleFor(item, {
   installed = [],
   installedVersions = {},
