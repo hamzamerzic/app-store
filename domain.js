@@ -122,6 +122,7 @@ export function installedVersionFor(item, installedVersions, installedApp) {
 }
 
 export function busyLabelForAction(actionKind) {
+  if (actionKind === 'checking_update') return 'Checking update…'
   if (actionKind === 'update') return 'Updating…'
   if (actionKind === 'resolve') return 'Opening chat…'
   if (actionKind === 'retry') return 'Retrying…'

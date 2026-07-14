@@ -13,6 +13,7 @@ export function CatalogList({
   busy,
   busyItemId,
   busyActionKind,
+  checkingUpdateItemId = null,
   errors,
   updateNotice,
   onReviewUpdate,
@@ -44,9 +45,12 @@ export function CatalogList({
       onUpdate={onUpdate}
       onOpenInstalled={onOpenInstalled}
       onRetryInstalled={onRetryInstalled}
-      busy={busyItemId === item.id}
-      busyActionKind={busyItemId === item.id ? busyActionKind : null}
-      blocked={busy && busyItemId !== item.id}
+      busy={busyItemId === item.id || checkingUpdateItemId === item.id}
+      busyActionKind={busyItemId === item.id
+        ? busyActionKind
+        : checkingUpdateItemId === item.id ? 'checking_update' : null}
+      blocked={(busy && busyItemId !== item.id) ||
+        (checkingUpdateItemId !== null && checkingUpdateItemId !== item.id)}
       error={errors?.[item.id]}
       updateNotice={updateNotice?.itemId === item.id ? updateNotice : null}
       onReviewUpdate={onReviewUpdate}

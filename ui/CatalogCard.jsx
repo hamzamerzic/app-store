@@ -84,7 +84,7 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
   const reviewLabel = lifecycle.actionKind === 'install'
     ? 'Review & install'
     : lifecycle.actionKind === 'update'
-    ? 'Review update'
+    ? 'Update'
     : lifecycle.actionLabel
   const actionLabel = busy ? busyLabelForAction(busyActionKind || lifecycle.actionKind) : reviewLabel
   const onCardAction = () => {

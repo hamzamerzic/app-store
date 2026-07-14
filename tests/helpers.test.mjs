@@ -497,14 +497,18 @@ test('capability rows disclose embedded agents, provider credentials, and offlin
   assert.match(rows.find(row => row.label === 'Offline use').summary, /partial offline execution/)
 })
 
-test('catalog actions route through detail consent and truthful uninstall copy', async () => {
+test('catalog updates use a fresh capability guard without a second tap', async () => {
   const indexSource = await readFile(join(root, '..', 'index.jsx'), 'utf8')
   const detailSource = await readFile(join(root, '..', 'ui', 'DetailView.jsx'), 'utf8')
+  const cardSource = await readFile(join(root, '..', 'ui', 'CatalogCard.jsx'), 'utf8')
   const uninstallSource = await readFile(join(root, '..', 'ui', 'UninstallConfirmModal.jsx'), 'utf8')
-  assert.ok(indexSource.includes('onUpdate={openDetail}'))
+  assert.ok(indexSource.includes('const handleCatalogUpdate = useCallback'))
+  assert.ok(indexSource.includes('onUpdate={handleCatalogUpdate}'))
+  assert.ok(indexSource.includes('capabilityDigest: preview.capability_digest'))
   assert.ok(indexSource.includes('reviewed_capability_digest: _opts.capabilityDigest'))
   assert.ok(detailSource.includes('<CapabilityContract'))
   assert.ok(detailSource.includes('capabilityReview.preview.capability_digest'))
+  assert.ok(cardSource.includes("? 'Update'"))
   assert.match(uninstallSource, /kept\s+temporarily for recovery/)
   assert.match(uninstallSource, /shared files.*not erased/)
 })
@@ -703,6 +707,7 @@ test('busy labels stay tied to the action that started', async () => {
 
   assert.equal(busyLabelForAction('update'), 'Updating…')
   assert.equal(busyLabelForAction('open'), 'Opening…')
+  assert.equal(busyLabelForAction('checking_update'), 'Checking update…')
 
   const source = await readFile(join(root, '..', 'index.jsx'), 'utf8')
   const cardSource = await readFile(join(root, '..', 'ui', 'CatalogCard.jsx'), 'utf8')

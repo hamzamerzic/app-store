@@ -233,6 +233,12 @@ export default function App({ appId, token }) {
   const [busy, setBusy] = useState(false)
   const [busyItemId, setBusyItemId] = useState(null)
   const [busyActionKind, setBusyActionKind] = useState(null)
+  // Catalog updates remain one tap. We still fetch the live capability
+  // contract immediately before applying one, but keep that check in-place
+  // instead of sending the owner through the detail screen just to press
+  // Update again.
+  const [checkingUpdateItemId, setCheckingUpdateItemId] = useState(null)
+  const checkingUpdateRef = useRef(null)
   const [toast, setToast] = useState(null)
   const [updateNotice, setUpdateNotice] = useState(null)
   const [cardErrors, setCardErrors] = useState({})
@@ -911,6 +917,50 @@ export default function App({ appId, token }) {
     }
   }, [detail, reviewCapabilities])
 
+  // The grid action used to open DetailView so the owner could manually review
+  // access before updating. That made a routine update two taps. Updates are
+  // now direct again: fetch a fresh server-derived digest at click time, then
+  // pass it to the same guarded installer DetailView uses. If the release
+  // changes in the tiny interval between preview and install, the backend
+  // rejects it with capability_changed and shows the new review instead.
+  const handleCatalogUpdate = useCallback(async (item, opts = {}) => {
+    if (!opts.isUpdate) {
+      openDetail(item)
+      return
+    }
+    if (busy || checkingUpdateRef.current) return
+    checkingUpdateRef.current = item.id
+    setCheckingUpdateItemId(item.id)
+    setCardErrors(prev => withoutKey(prev, item.id))
+    try {
+      const preview = await previewApp({
+        manifest_url: item.manifest_url,
+        manifest: item.manifest,
+        raw_base: item.raw_base,
+        token,
+      })
+      setCapabilityReviews(prev => ({
+        ...prev,
+        [item.id]: { status: 'ready', preview, error: '' },
+      }))
+      await handleInstall(item, {
+        isUpdate: true,
+        capabilityDigest: preview.capability_digest,
+      })
+    } catch (error) {
+      const message = error.message || 'This update could not be checked.'
+      setCapabilityReviews(prev => ({
+        ...prev,
+        [item.id]: { status: 'error', preview: null, error: message },
+      }))
+      setCardErrors(prev => ({ ...prev, [item.id]: message }))
+      setToast({ kind: 'error', message })
+    } finally {
+      checkingUpdateRef.current = null
+      setCheckingUpdateItemId(null)
+    }
+  }, [busy, handleInstall, openDetail, token])
+
   // closeDetail: tell the shell to pop its sentinel, then clear our
   // own detail state. Idempotent — calling when detail is already
   // null is a no-op.
@@ -1126,13 +1176,14 @@ export default function App({ appId, token }) {
                     updateChecks={updateChecks}
                     onPick={(item) => item.manifest && openDetail(item)}
                     onRetry={retryCatalogItem}
-                    onUpdate={openDetail}
+                    onUpdate={handleCatalogUpdate}
                     onOpenInstalled={handleOpenInstalled}
                     onRetryInstalled={handleRetryInstalled}
                     busy={busy}
                     installedUnavailable={!!installedLoadError}
                     busyItemId={busyItemId}
                     busyActionKind={busyActionKind}
+                    checkingUpdateItemId={checkingUpdateItemId}
                     errors={cardErrors}
                     updateNotice={updateNotice}
                     onReviewUpdate={handleReviewUpdate}
