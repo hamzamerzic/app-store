@@ -71,6 +71,15 @@ export const CATALOG = [
       capabilities: ['build interactive artifacts in chat', 'preview and version artifacts', 'share artifacts publicly'],
     },
   {
+      id: 'maps',
+      repo: 'mobius-os/app-maps',
+      manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-maps/main/mobius.json',
+      raw_base: 'https://raw.githubusercontent.com/mobius-os/app-maps/main/',
+      categories: ['reference', 'productivity'],
+      keywords: ['maps', 'locations', 'places', 'recommendations', 'restaurants', 'coworking', 'geocoding', 'openstreetmap'],
+      capabilities: ['turn location recommendations into interactive maps', 'keep maps linked to source chats', 'browse saved places'],
+    },
+  {
       id: 'tasks',
       repo: 'mobius-os/app-tasks',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-tasks/main/mobius.json',

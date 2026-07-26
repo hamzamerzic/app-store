@@ -266,6 +266,43 @@ export const MANIFEST_SNAPSHOTS = {
       "ui/VersionTimeline.jsx"
     ]
   },
+  "maps": {
+    "id": "maps",
+    "previous_id": "mapbook",
+    "name": "Maps",
+    "version": "0.1.1",
+    "description": "Visualise and keep maps created in Möbius, with a location skill and links back to their source conversations.",
+    "author": "mobius-os",
+    "license": "MIT",
+    "homepage": "https://github.com/mobius-os/app-maps",
+    "entry": "index.jsx",
+    "icon": "icon.png",
+    "offline_capable": false,
+    "permissions": {
+      "cross_app_access": "none",
+      "share_with_apps": "none"
+    },
+    "runtime": {
+      "imports": [
+        "react",
+        "react-dom",
+        "lucide-react"
+      ],
+      "esm_deps": []
+    },
+    "skills": [
+      "maps-app.md"
+    ],
+    "source_files": [
+      "domain.js",
+      "storage.js",
+      "skillIcon.js",
+      "theme.js",
+      "maps-app.md",
+      "scripts/add_map.py",
+      "scripts/maps_client.py"
+    ]
+  },
   "tasks": {
     "id": "tasks",
     "name": "Tasks",

@@ -1100,3 +1100,14 @@ test('Beat Machine discovery entry describes the sequencer', async () => {
   assert.ok(entry.keywords.includes('sequencer'))
   assert.ok(entry.capabilities.some((capability) => /32-step/.test(capability)))
 })
+
+test('Maps discovery entry exposes saved-map and skill capabilities', async () => {
+  const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
+  const entry = catalog.apps.find((item) => item.id === 'maps')
+
+  assert.ok(entry, 'catalog contains Maps')
+  assert.equal(entry.repo, 'mobius-os/app-maps')
+  assert.ok(entry.keywords.includes('geocoding'))
+  assert.ok(entry.capabilities.some((capability) => /source chats/.test(capability)))
+  assert.deepEqual(entry.manifest.skills, ['maps-app.md'])
+})
