@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-07-24",
+  "updated": "2026-07-26",
   "note": "Web registry of Mobius App Store catalog entries. The store fetches this at mount (via the server proxy) so a new app appears in every instance's store the moment this file lands on main — no store-app redeploy. constants.js CATALOG is the baked fallback used only if this fetch fails; keep the two in sync. Each entry: { id, repo, manifest_url, raw_base, categories?, keywords?, capabilities?, setup?, manifest? }. manifest is an optional validated summary/full manifest used for fast first paint; missing or invalid manifests fall back to fetching manifest_url. setup marks apps that need system or in-app configuration before their agent/scheduled features are useful. categories/keywords/capabilities are intentionally machine-readable so agents can search existing apps before building or remixing.",
   "apps": [
     {
@@ -418,6 +418,70 @@
           "ui/ShareSheet.jsx",
           "ui/sharePolling.js",
           "ui/VersionTimeline.jsx"
+        ]
+      }
+    },
+    {
+      "id": "maps",
+      "name": "Maps",
+      "description": "Visualise and keep maps created in Möbius, with a location skill and links back to their source conversations.",
+      "repo": "mobius-os/app-maps",
+      "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-maps/main/mobius.json",
+      "raw_base": "https://raw.githubusercontent.com/mobius-os/app-maps/main/",
+      "categories": [
+        "reference",
+        "productivity"
+      ],
+      "keywords": [
+        "maps",
+        "locations",
+        "places",
+        "recommendations",
+        "restaurants",
+        "coworking",
+        "geocoding",
+        "openstreetmap"
+      ],
+      "capabilities": [
+        "turn location recommendations into interactive maps",
+        "keep maps linked to source chats",
+        "browse saved places"
+      ],
+      "manifest": {
+        "id": "maps",
+        "previous_id": "mapbook",
+        "name": "Maps",
+        "version": "0.1.1",
+        "description": "Visualise and keep maps created in Möbius, with a location skill and links back to their source conversations.",
+        "author": "mobius-os",
+        "license": "MIT",
+        "homepage": "https://github.com/mobius-os/app-maps",
+        "entry": "index.jsx",
+        "icon": "icon.png",
+        "offline_capable": false,
+        "permissions": {
+          "cross_app_access": "none",
+          "share_with_apps": "none"
+        },
+        "runtime": {
+          "imports": [
+            "react",
+            "react-dom",
+            "lucide-react"
+          ],
+          "esm_deps": []
+        },
+        "skills": [
+          "maps-app.md"
+        ],
+        "source_files": [
+          "domain.js",
+          "storage.js",
+          "skillIcon.js",
+          "theme.js",
+          "maps-app.md",
+          "scripts/add_map.py",
+          "scripts/maps_client.py"
         ]
       }
     },
