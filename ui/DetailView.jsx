@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { appLifecycleFor, busyLabelForAction, isTrustedHost, scheduleSummary } from '../domain.js'
 import { CapabilityContract } from './CapabilityContract.jsx'
 import { IconBox, installedIconUrl } from './IconBox.jsx'
@@ -63,6 +64,14 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
       : (!storeInstalled || lifecycle.setupNeedsAttention)
   )
   const canOpenSetup = showSetup && (setup.scope === 'system' || storeInstalled)
+  const accessChanged = capabilityReview?.status === 'changed'
+  const [technicalOpen, setTechnicalOpen] = useState(accessChanged)
+  useEffect(() => {
+    if (accessChanged) setTechnicalOpen(true)
+  }, [accessChanged])
+  const releaseSummary = storeInstalled && installedVer && installedVer !== m.version
+    ? `Installed v${installedVer} · latest v${m.version}`
+    : `Release v${m.version}`
 
   // Use the same first-paint, browser-cacheable installed icon as the grid.
   const heroItemWithIcon = storeInstalled
@@ -79,9 +88,11 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
           <IconBox item={heroItemWithIcon} size="hero" token={token} />
           <div className="st-hero-text">
             <h2 className="st-hero-name">{m.name}</h2>
-            <div className="st-hero-meta">
-              v{m.version}{m.author ? ` · ${m.author}` : ''}{m.license ? ` · ${m.license}` : ''}
-            </div>
+            {(m.author || m.license) && (
+              <div className="st-hero-meta">
+                {[m.author, m.license].filter(Boolean).join(' · ')}
+              </div>
+            )}
           </div>
         </div>
 
@@ -100,15 +111,6 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
             </button>
           </div>
         )}
-
-        <div className="st-detail-section">
-          <div className="st-section-label">Access and agent integration</div>
-          <CapabilityContract
-            review={capabilityReview}
-            onRetry={onRetryCapabilityReview}
-            isInstalled={!!storeInstalled}
-          />
-        </div>
 
         {scheduleText && (
           <div className="st-detail-section">
@@ -151,59 +153,34 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
           </div>
         )}
 
-        {m.runtime?.esm_deps?.length > 0 && (
+        {storeInstalled && blockedUpdate && updateNotice && (
           <div className="st-detail-section">
-            <div className="st-section-label">External libraries</div>
-            <div className="st-esm-note">
-              Loads {m.runtime.esm_deps.length === 1 ? 'one library' : `${m.runtime.esm_deps.length} libraries`}
-              {' '}from esm.sh on first open. Fetched once and cached locally afterwards.
-              <div className="st-esm-dep-list">{m.runtime.esm_deps.join(', ')}</div>
-            </div>
-          </div>
-        )}
-
-        {m.homepage && (
-          <div className="st-detail-section">
-            <div className="st-section-label">Source</div>
-            <a href={m.homepage} target="_blank" rel="noopener noreferrer" className="st-link">
-              {m.homepage}
-            </a>
-          </div>
-        )}
-
-        {storeInstalled && (
-          <div className="st-detail-section">
-            <div className="st-section-label">Installed</div>
-            <div className="st-installed-note">
-              Currently installed: {installedVer ? `v${installedVer}` : 'version unknown'}.
-            </div>
-            {blockedUpdate && updateNotice && (
-              <div className="st-update-notice">
-                <div>{updateNotice.message}</div>
-                <div className="st-update-notice-actions">
-                  <button
-                    type="button"
-                    className="st-btn st-btn-primary"
-                    onClick={() => onReviewUpdate(updateNotice)}
-                    disabled={busy}
-                  >
-                    {busy
-                      ? busyLabelForAction('resolve')
-                      : updateNotice.kind === 'conflict'
-                      ? 'Resolve update'
-                      : 'Review in chat'}
-                  </button>
-                  <button
-                    type="button"
-                    className="st-btn st-btn-secondary"
-                    onClick={onDismissNotice}
-                    disabled={busy}
-                  >
-                    Not now
-                  </button>
-                </div>
+            <div className="st-section-label">Update</div>
+            <div className="st-update-notice">
+              <div>{updateNotice.message}</div>
+              <div className="st-update-notice-actions">
+                <button
+                  type="button"
+                  className="st-btn st-btn-primary"
+                  onClick={() => onReviewUpdate(updateNotice)}
+                  disabled={busy}
+                >
+                  {busy
+                    ? busyLabelForAction('resolve')
+                    : updateNotice.kind === 'conflict'
+                    ? 'Resolve update'
+                    : 'Review in chat'}
+                </button>
+                <button
+                  type="button"
+                  className="st-btn st-btn-secondary"
+                  onClick={onDismissNotice}
+                  disabled={busy}
+                >
+                  Not now
+                </button>
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -221,6 +198,49 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
             </div>
           </div>
         )}
+
+        <details
+          className={`st-technical-details${accessChanged ? ' is-attention' : ''}`}
+          open={technicalOpen}
+          onToggle={(event) => setTechnicalOpen(event.currentTarget.open)}
+        >
+          <summary className="st-technical-summary">
+            <span className="st-technical-summary-main">Privacy, access & technical details</span>
+            <span className="st-technical-summary-meta">
+              {accessChanged ? `Access changes · ${releaseSummary}` : releaseSummary}
+            </span>
+          </summary>
+          <div className="st-technical-body">
+            <div className="st-technical-section">
+              <div className="st-section-label">Privacy & access</div>
+              <CapabilityContract
+                review={capabilityReview}
+                onRetry={onRetryCapabilityReview}
+                isInstalled={!!storeInstalled}
+              />
+            </div>
+
+            {m.runtime?.esm_deps?.length > 0 && (
+              <div className="st-technical-section">
+                <div className="st-section-label">External libraries</div>
+                <div className="st-esm-note">
+                  Loads {m.runtime.esm_deps.length === 1 ? 'one library' : `${m.runtime.esm_deps.length} libraries`}
+                  {' '}from esm.sh on first open. Fetched once and cached locally afterwards.
+                  <div className="st-esm-dep-list">{m.runtime.esm_deps.join(', ')}</div>
+                </div>
+              </div>
+            )}
+
+            {m.homepage && (
+              <div className="st-technical-section">
+                <div className="st-section-label">Source</div>
+                <a href={m.homepage} target="_blank" rel="noopener noreferrer" className="st-link">
+                  {m.homepage}
+                </a>
+              </div>
+            )}
+          </div>
+        </details>
 
       </div>
 

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "updated": "2026-07-29",
-  "note": "Web registry of Mobius App Store discovery entries. The store fetches this at mount so catalog membership and discovery copy can update without a Store release. Each entry points to its app repo and live mobius.json; version-coupled manifest snapshots belong only in manifest-snapshots.js for the baked offline first-paint floor. Keep catalog.json and constants.js membership in sync.",
+  "note": "Web registry of Mobius App Store discovery entries. The store fetches this at mount so membership and concise browse copy can update without a Store release. Each entry points to its app repo and live mobius.json; audience and collection shape the curated shelves, while summary is short card copy. Version-coupled manifest snapshots belong only in manifest-snapshots.js for the baked offline first-paint floor. Keep catalog.json and constants.js membership in sync.",
   "apps": [
     {
       "id": "memory",
@@ -39,7 +39,10 @@
           "model",
           "fallback"
         ]
-      }
+      },
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "A private knowledge graph for your agent."
     },
     {
       "id": "reflection",
@@ -75,7 +78,10 @@
           "model",
           "fallback"
         ]
-      }
+      },
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "A morning brief on what Möbius learned."
     },
     {
       "id": "workflows",
@@ -103,7 +109,10 @@
         "timeline of chat turns and their subagents",
         "subagent lifecycle: merged / launched / failed / stopped",
         "scheduled and on-demand digest of chats"
-      ]
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "See what every background agent did."
     },
     {
       "id": "skills",
@@ -127,7 +136,10 @@
         "browse skills",
         "read agent procedures",
         "search instructions"
-      ]
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "Browse the playbooks behind your agent."
     },
     {
       "id": "artifacts",
@@ -154,7 +166,10 @@
         "build interactive artifacts in chat",
         "preview and version artifacts",
         "share artifacts publicly"
-      ]
+      ],
+      "audience": "general",
+      "collection": "create",
+      "summary": "Create interactive pages and polished reports."
     },
     {
       "id": "maps",
@@ -181,7 +196,10 @@
         "turn location recommendations into interactive maps",
         "keep maps linked to source chats",
         "browse saved places"
-      ]
+      ],
+      "audience": "general",
+      "collection": "explore",
+      "summary": "Turn place ideas into maps you can keep."
     },
     {
       "id": "tasks",
@@ -204,7 +222,10 @@
         "manage tasks",
         "organize projects",
         "track status"
-      ]
+      ],
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "See every scheduled agent check-in."
     },
     {
       "id": "contribute",
@@ -237,7 +258,10 @@
         "fields": [
           "github"
         ]
-      }
+      },
+      "audience": "general",
+      "collection": "developer",
+      "summary": "Review and share improvements to Möbius."
     },
     {
       "id": "notes",
@@ -262,7 +286,10 @@
         "write markdown notes",
         "preview while editing",
         "attach images and files"
-      ]
+      ],
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "Markdown notes with checklists, images, and search."
     },
     {
       "id": "news",
@@ -300,7 +327,10 @@
           "model",
           "fallback"
         ]
-      }
+      },
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "A daily briefing on the topics you care about."
     },
     {
       "id": "editor",
@@ -324,7 +354,10 @@
         "edit files",
         "write markdown",
         "preview content"
-      ]
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "Edit any Möbius file yourself or with your agent."
     },
     {
       "id": "webstudio",
@@ -349,7 +382,10 @@
         "build web pages",
         "preview projects",
         "edit site files"
-      ]
+      ],
+      "audience": "general",
+      "collection": "create",
+      "summary": "Build a website live with your agent."
     },
     {
       "id": "gym",
@@ -374,7 +410,10 @@
         "log workouts",
         "track progress",
         "plan routines"
-      ]
+      ],
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "Log workouts by chat and track your progress."
     },
     {
       "id": "habits",
@@ -398,7 +437,10 @@
         "track streaks",
         "schedule reminders",
         "view habit calendar"
-      ]
+      ],
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "Build lasting routines with streaks and reminders."
     },
     {
       "id": "beat-machine",
@@ -408,7 +450,8 @@
       "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-beat-machine/main/mobius.json",
       "raw_base": "https://raw.githubusercontent.com/mobius-os/app-beat-machine/main/",
       "categories": [
-        "creative"
+        "creative",
+        "music"
       ],
       "keywords": [
         "beats",
@@ -424,7 +467,10 @@
         "sequence 32-step patterns",
         "record custom sounds",
         "adjust bpm and effects"
-      ]
+      ],
+      "audience": "general",
+      "collection": "play",
+      "summary": "Make beats with 32 steps and your own sounds."
     },
     {
       "id": "atlas",
@@ -448,7 +494,10 @@
         "explore globe",
         "select countries",
         "inspect geography"
-      ]
+      ],
+      "audience": "general",
+      "collection": "explore",
+      "summary": "Mark where you've been on a living 3D globe."
     },
     {
       "id": "latex",
@@ -473,7 +522,10 @@
         "edit latex",
         "compile pdf",
         "manage document files"
-      ]
+      ],
+      "audience": "general",
+      "collection": "create",
+      "summary": "Write polished PDFs with live preview."
     },
     {
       "id": "tandem",
@@ -511,7 +563,10 @@
           "provider",
           "model"
         ]
-      }
+      },
+      "audience": "general",
+      "collection": "explore",
+      "summary": "Learn languages through made-for-you stories."
     },
     {
       "id": "cuberun",
@@ -533,7 +588,10 @@
       "capabilities": [
         "play arcade runner",
         "render 3d scene"
-      ]
+      ],
+      "audience": "general",
+      "collection": "play",
+      "summary": "Chase a high score in a neon 3D world."
     }
   ]
 }

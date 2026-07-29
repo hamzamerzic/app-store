@@ -36,6 +36,14 @@ so publishing an app release does not require an App Store catalog change.
 Install and update actions always send the live `manifest_url` to the backend,
 so a snapshot is never treated as install authority.
 
+Browse cards use the catalog's concise discovery summary when available and
+fall back to the manifest description. Summaries are capped at 52 characters
+on a word boundary; the complete manifest description remains in app details.
+Catalog entries can declare a curated `collection`: **Everyday**, **Create**,
+**Explore & learn**, **Play**, or **Build & run Möbius**. Entries without one
+fall back to their audience and categories, so new apps still land somewhere
+sensible.
+
 ### Naming convention
 
 Manifest `id` == repo name minus the `app-` prefix == lowercased display name; renames set `previous_id` so installs migrate in place rather than duplicating.

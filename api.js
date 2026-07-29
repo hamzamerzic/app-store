@@ -241,9 +241,9 @@ export async function fetchManifest(url, token, opts = {}) {
 // list of catalog entries, or throw. Accepts either a bare array or a
 // `{ apps: [...] }` envelope. Each entry must carry a string id and https
 // manifest_url + raw_base; malformed entries are dropped rather than trusted.
-// Top-level `name`/`description` (sanitized) pass through as pre-hydration
-// display hints — the discovery-index catalog shape carries them so a card can
-// show a real name before its manifest_url resolves, instead of the bare id.
+// Top-level `name`/`description`/`summary` (sanitized) pass through as
+// discovery copy. `collection` gives curated catalogs a stable browse shelf;
+// callers derive a shelf from categories when it is absent.
 // A valid embedded `manifest` is preserved as a fast first-paint snapshot. Older
 // registries without it still work: callers fall back to fetching manifest_url.
 // The caller falls back to the baked CATALOG when this throws or yields nothing.
@@ -335,13 +335,23 @@ export async function fetchCatalog(url, token, opts = {}) {
     // can't collide on a repeated React key.
     if (seen.has(e.id)) continue
     seen.add(e.id)
+    const audience = e.audience === 'developer' || e.audience === 'general'
+      ? e.audience
+      : null
+    const collection = [
+      'everyday', 'create', 'explore', 'play', 'developer',
+    ].includes(e.collection) ? e.collection : null
+    const summary = cleanString(e.summary, 96)
     entries.push({
       id: e.id,
       name: cleanString(e.name),
       description: cleanString(e.description),
+      ...(summary ? { summary } : {}),
       repo: typeof e.repo === 'string' ? e.repo : undefined,
       manifest_url: e.manifest_url,
       raw_base: e.raw_base,
+      ...(audience ? { audience } : {}),
+      ...(collection ? { collection } : {}),
       categories: cleanList(e.categories, 6),
       keywords: cleanList(e.keywords, 16),
       capabilities: cleanList(e.capabilities, 12),

@@ -274,6 +274,32 @@ export const CSS = `
   }
 }
 
+/* Curated collections keep very different kinds of apps discoverable without
+   turning each category into a separate catalog. Search and lifecycle filters
+   preserve the same shelves and simply hide empty ones. */
+.st-catalog-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.st-catalog-section { min-width: 0; }
+.st-catalog-section-head { margin: 0 0 12px; }
+.st-catalog-section-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 720;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.st-catalog-section-desc {
+  margin: 4px 0 0;
+  max-width: 66ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* App-specific catalog grid + tiles. The vertical-tile card diverges
    structurally from the canonical horizontal list Card, so it keeps the
    store's own values + class names. State rides is-* modifier classes. */
@@ -319,7 +345,7 @@ export const CSS = `
   border: 1px dashed var(--border);
 }
 /* The app name is the card's open affordance. Its ::after overlay covers
-   the whole card so the icon / name / version / desc all open details. */
+   the whole card so the icon / name / description all open details. */
 .st-card-open {
   position: static;
   border: 0; background: transparent; padding: 0; margin: 0 0 4px;
@@ -417,16 +443,17 @@ export const CSS = `
   display: -webkit-box; -webkit-line-clamp: 2;
   -webkit-box-orient: vertical; overflow: hidden;
 }
-.st-card-version {
-  font-size: 12px; color: var(--muted);
-  font-family: var(--mono, monospace);
-  margin-bottom: 5px;
-  display: flex; align-items: center; gap: 6px;
+.st-card-state-row {
+  width: 100%;
+  min-height: 20px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 .st-card-state-line {
   max-width: 100%;
-  min-height: 17px;
-  margin-bottom: 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 650;
@@ -439,6 +466,7 @@ export const CSS = `
 .st-card-state-line.is-conflict { color: var(--danger, #e5484d); }
 .st-card-state-line.is-unavailable { color: var(--muted); }
 .st-card-agent {
+  flex: 0 0 auto;
   font-family: var(--font, inherit); font-weight: 600;
   font-size: 12px; letter-spacing: 0;
   color: var(--text);
@@ -449,10 +477,8 @@ export const CSS = `
 .st-card-desc {
   font-size: 12px; color: var(--muted); line-height: 1.35;
   margin-bottom: 12px;
-  display: -webkit-box; -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical; overflow: hidden;
   text-align: center;
-  min-height: 33px;
+  min-height: 49px;
 }
 /* Top-border separator between the description and the one card action.
    Each card reads as exactly one state/action: Install, Installed, or Update.
@@ -746,6 +772,47 @@ export const CSS = `
 .st-capability-change { margin-bottom: 10px; color: var(--text); }
 .st-capability-list { display: grid; gap: 8px; }
 .st-perm-hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+/* Progressive disclosure for the information that matters during review or
+   troubleshooting but should not dominate everyday app browsing. Permission
+   changes open this section automatically; stable access stays collapsed. */
+.st-technical-details {
+  margin: 8px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.st-technical-details.is-attention {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.st-technical-summary {
+  min-height: 58px;
+  padding: 12px 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+.st-technical-summary-main {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+}
+.st-technical-summary-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.st-technical-details.is-attention .st-technical-summary-meta { color: var(--accent); }
+.st-technical-body {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+.st-technical-section + .st-technical-section { margin-top: 20px; }
 /* A short capability tag next to each permission row. State (read / write /
    muted) rides is-* modifiers; 'no'/'none' both render muted. */
 .st-perm-tag {

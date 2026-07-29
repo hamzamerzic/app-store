@@ -1,4 +1,33 @@
 import { CatalogCard } from './CatalogCard.jsx'
+import { catalogCollection } from '../domain.js'
+
+const CATALOG_COLLECTIONS = [
+  {
+    id: 'everyday',
+    title: 'Everyday',
+    description: 'Plan your day, stay informed, and build routines that stick.',
+  },
+  {
+    id: 'create',
+    title: 'Create',
+    description: 'Make websites, documents, and interactive ideas with your agent.',
+  },
+  {
+    id: 'explore',
+    title: 'Explore & learn',
+    description: 'Travel the world and learn something new along the way.',
+  },
+  {
+    id: 'play',
+    title: 'Play',
+    description: 'Make some noise or chase a high score.',
+  },
+  {
+    id: 'developer',
+    title: 'Build & run Möbius',
+    description: 'Shape how Möbius thinks, works, and evolves.',
+  },
+]
 
 export function CatalogList({
   items,
@@ -65,8 +94,26 @@ export function CatalogList({
       systemSetupReady={systemSetupReady}
     />
   )
+  const groups = CATALOG_COLLECTIONS
+    .map((group) => ({
+      ...group,
+      items: items.filter((item) => catalogCollection(item) === group.id),
+    }))
+    .filter((group) => group.items.length > 0)
+  const renderGroup = (group) => (
+    <section className="st-catalog-section" key={group.id} aria-labelledby={`st-group-${group.id}`}>
+      <div className="st-catalog-section-head">
+        <h2 id={`st-group-${group.id}`} className="st-catalog-section-title">{group.title}</h2>
+        <p className="st-catalog-section-desc">{group.description}</p>
+      </div>
+      <div className="st-catalog-grid">{group.items.map(renderCard)}</div>
+    </section>
+  )
+
   return (
-    <div className="st-catalog-grid">{items.map(renderCard)}</div>
+    <div className="st-catalog-sections">
+      {groups.map(renderGroup)}
+    </div>
   )
 }
 

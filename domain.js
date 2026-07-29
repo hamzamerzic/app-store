@@ -293,7 +293,7 @@ export function appLifecycleFor(item, {
   if (installedApp) {
     return {
       key: 'installed',
-      statusLabel: installedVersion ? `Installed v${installedVersion}` : 'Installed',
+      statusLabel: 'Installed',
       actionLabel: 'Open',
       actionKind: 'open',
       cardVariant: 'installed',
@@ -356,6 +356,54 @@ export function isSystemCatalogItem(item) {
   return itemCategories(item).some((category) => category.toLowerCase() === 'system')
 }
 
+export const CARD_DESCRIPTION_LIMIT = 52
+
+export function catalogCardDescription(item, limit = CARD_DESCRIPTION_LIMIT) {
+  const source = item?.summary || item?.description || item?.manifest?.description || ''
+  const compact = String(source).replace(/\s+/g, ' ').trim()
+  if (!compact || compact.length <= limit) return compact
+  if (limit <= 1) return '…'.slice(0, Math.max(0, limit))
+  const available = compact.slice(0, limit - 1).trimEnd()
+  const wordBreak = available.lastIndexOf(' ')
+  const text = wordBreak >= Math.floor(limit * 0.55)
+    ? available.slice(0, wordBreak)
+    : available
+  return `${text}…`
+}
+
+export function catalogAudience(item) {
+  if (item?.audience === 'developer' || item?.audience === 'general') {
+    return item.audience
+  }
+  return isSystemCatalogItem(item) ? 'developer' : 'general'
+}
+
+const CATALOG_COLLECTIONS = new Set([
+  'everyday',
+  'create',
+  'explore',
+  'play',
+  'developer',
+])
+
+export function catalogCollection(item) {
+  const curated = String(item?.collection || '').trim().toLowerCase()
+  if (CATALOG_COLLECTIONS.has(curated)) return curated
+
+  const categories = itemCategories(item).map((category) => category.toLowerCase())
+  if (catalogAudience(item) === 'developer' || categories.includes('system')) {
+    return 'developer'
+  }
+  if (categories.includes('games') || categories.includes('music')) return 'play'
+  if (categories.includes('reference') || categories.includes('learning')) {
+    return 'explore'
+  }
+  if (categories.includes('creative') || categories.includes('development')) {
+    return 'create'
+  }
+  return 'everyday'
+}
+
 export function sortCatalogForDisplay(items) {
   return [...(items || [])].sort((a, b) => {
     const aSystem = isSystemCatalogItem(a)
@@ -394,6 +442,8 @@ export function catalogSearchText(item) {
   return [
     item?.id,
     item?.repo,
+    item?.summary,
+    item?.description,
     m.id,
     m.name,
     m.description,
