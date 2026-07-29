@@ -1040,6 +1040,13 @@ test('app details keep stable access information in a bottom disclosure', async 
   assert.doesNotMatch(source, /Access and agent integration/)
 })
 
+test('desktop measure applies to every direct scroll child without a class allowlist', async () => {
+  const theme = await readFile(join(root, '..', 'theme.js'), 'utf8')
+
+  assert.match(theme, /\.st-scroll > \* \{\s*\n\s*max-width: 840px;\s*\n\s*margin-inline: auto;/)
+  assert.doesNotMatch(theme, /\.st-scroll > \.st-[a-z-]+,\s*$/m)
+})
+
 test('busy labels stay tied to the action that started', async () => {
   const { appLifecycleFor, busyLabelForAction } = await bundle()
   const item = {

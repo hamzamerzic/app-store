@@ -1223,16 +1223,7 @@ export const CSS = `
     flex: 0 0 auto;
     width: 100%;
   }
-  .st-scroll > .st-section,
-  .st-scroll > .st-catalog-grid,
-  .st-scroll > .st-empty,
-  .st-scroll > .st-banner,
-  .st-scroll > .st-discovery,
-  .st-scroll > .st-url-form,
-  .st-scroll > .st-hero,
-  .st-scroll > .st-detail-desc,
-  .st-scroll > .st-detail-section,
-  .st-scroll > .st-update-notice {
+  .st-scroll > * {
     max-width: 840px;
     margin-inline: auto;
   }
