@@ -1,4 +1,4 @@
-import { appLifecycleFor, busyLabelForAction } from '../domain.js'
+import { appLifecycleFor, busyLabelForAction, catalogCardDescription } from '../domain.js'
 import { IconBox, installedIconUrl } from './IconBox.jsx'
 
 function cardVariantClass(variant) {
@@ -125,10 +125,11 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
   const itemWithIcon = storeInstalled
     ? { ...item, installed_icon_url: installedIconUrl(storeInstalled) }
     : item
+  const description = catalogCardDescription(item)
   // The card is a non-interactive container. Two cleanly-separated AT
   // targets sit inside it: the app name is a real <button> whose ::after
   // overlay stretches across the whole card to open details (so the icon /
-  // version / desc region is still tappable), and the action button rides a
+  // description region is still tappable), and the action button rides a
   // z-index layer above that overlay so it stays independently clickable.
   // No nested role=button, no stopPropagation gymnastics.
   return (
@@ -151,17 +152,16 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
       >
         {m.name}
       </button>
-      <div className="st-card-version">
-        v{m.version}
+      <div className="st-card-state-row">
+        <div className={`st-card-state-line is-${lifecycle.key}`}>
+          {lifecycle.statusLabel}
+        </div>
         {m.embeds_agent ? (
-          <span className="st-card-agent" title="This app includes an in-app agent">agent</span>
+          <span className="st-card-agent" title="This app includes an in-app agent">Agent</span>
         ) : null}
       </div>
-      <div className={`st-card-state-line is-${lifecycle.key}`}>
-        {lifecycle.statusLabel}
-      </div>
-      {m.description ? (
-        <div className="st-card-desc" title={m.description}>{m.description}</div>
+      {description ? (
+        <div className="st-card-desc">{description}</div>
       ) : null}
       <div className="st-card-status-row">
         <button

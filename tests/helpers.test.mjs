@@ -276,6 +276,9 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
     apps: [
       {
         id: 'notes',
+        audience: 'general',
+        collection: 'everyday',
+        summary: 'Capture notes without losing your train of thought.',
         repo: 'mobius-os/app-notes',
         manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
         raw_base: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/',
@@ -317,6 +320,9 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
     })
     assert.equal(calls, 2)
     assert.equal(entries.length, 2)
+    assert.equal(entries[0].audience, 'general')
+    assert.equal(entries[0].collection, 'everyday')
+    assert.equal(entries[0].summary, 'Capture notes without losing your train of thought.')
     assert.deepEqual(entries[0].categories, ['productivity', 'writing'])
     assert.deepEqual(entries[0].keywords, ['notes', 'markdown'])
     assert.deepEqual(entries[0].capabilities, ['write markdown notes'])
@@ -337,6 +343,9 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
       entry: 'index.jsx',
     })
     assert.equal(entries[1].manifest, null)
+    assert.equal(Object.hasOwn(entries[1], 'audience'), false)
+    assert.equal(Object.hasOwn(entries[1], 'collection'), false)
+    assert.equal(Object.hasOwn(entries[1], 'summary'), false)
   } finally {
     globalThis.fetch = oldFetch
   }
@@ -701,6 +710,38 @@ test('filterCatalog matches categories, descriptions, and setup metadata', async
   assert.deepEqual(filterCatalog(items, { query: 'earth', category: 'reference' }).map(i => i.id), ['atlas'])
 })
 
+test('catalog cards prefer concise discovery copy and use stable browse collections', async () => {
+  const {
+    CARD_DESCRIPTION_LIMIT,
+    catalogAudience,
+    catalogCardDescription,
+    catalogCollection,
+  } = await bundle()
+  const description = catalogCardDescription({
+    summary: 'A concise promise for everyday browsing.',
+    manifest: {
+      description: 'A longer technical description that belongs in app information.',
+    },
+  })
+  assert.equal(description, 'A concise promise for everyday browsing.')
+
+  const truncated = catalogCardDescription({
+    manifest: {
+      description: 'Build, use, and share agent-powered tools without reading a long technical description that belongs in app information.',
+    },
+  })
+  assert.ok(truncated.length <= CARD_DESCRIPTION_LIMIT)
+  assert.match(truncated, /…$/)
+  assert.equal(catalogAudience({ categories: ['system', 'agents'] }), 'developer')
+  assert.equal(catalogAudience({ categories: ['writing'] }), 'general')
+  assert.equal(catalogCollection({ collection: 'play' }), 'play')
+  assert.equal(catalogCollection({ categories: ['reference'] }), 'explore')
+  assert.equal(catalogCollection({
+    audience: 'general',
+    categories: ['development', 'system'],
+  }), 'developer')
+})
+
 test('sortCatalogForDisplay promotes system apps without scrambling groups', async () => {
   const { collectCategories, sortCatalogForDisplay } = await bundle()
   const items = [
@@ -797,6 +838,10 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
     ...item,
     manifest: { ...item.manifest, version: '1.1.0' },
   }, { installed }).actionKind, 'open')
+  assert.equal(appLifecycleFor({
+    ...item,
+    manifest: { ...item.manifest, version: '1.1.0' },
+  }, { installed }).statusLabel, 'Installed')
   assert.equal(appLifecycleFor({
     ...item,
     manifest: { ...item.manifest, version: '1.1.0' },
@@ -983,6 +1028,18 @@ test('successful updates clear stale git update checks and inline errors', async
   assert.ok(detailSource.includes('!blockedUpdate && (!storeInstalled || hasUpdate)'))
 })
 
+test('app details keep stable access information in a bottom disclosure', async () => {
+  const source = await readFile(join(root, '..', 'ui', 'DetailView.jsx'), 'utf8')
+  const disclosure = source.indexOf('className={`st-technical-details')
+  const capability = source.indexOf('<CapabilityContract', disclosure)
+  const footer = source.indexOf('className="st-detail-footer"', disclosure)
+  assert.ok(disclosure >= 0)
+  assert.ok(capability > disclosure)
+  assert.ok(footer > capability)
+  assert.match(source, /Privacy, access & technical details/)
+  assert.doesNotMatch(source, /Access and agent integration/)
+})
+
 test('busy labels stay tied to the action that started', async () => {
   const { appLifecycleFor, busyLabelForAction } = await bundle()
   const item = {
@@ -1076,6 +1133,7 @@ test('catalog is a release-independent discovery index with a baked snapshot flo
   const constants = await readFile(join(root, '..', 'constants.js'), 'utf8')
   const snapshots = await readFile(join(root, '..', 'manifest-snapshots.js'), 'utf8')
   const refresh = await readFile(join(root, '..', 'scripts', 'refresh-manifest-snapshots.mjs'), 'utf8')
+  const collections = new Set(['everyday', 'create', 'explore', 'play', 'developer'])
 
   assert.ok(Array.isArray(catalog.apps) && catalog.apps.length > 0)
   for (const entry of catalog.apps) {
@@ -1084,6 +1142,9 @@ test('catalog is a release-independent discovery index with a baked snapshot flo
     assert.match(entry.id, /^[a-z0-9-]+$/)
     assert.ok(entry.name, `${entry.id}: discovery entries carry a name`)
     assert.ok(entry.description, `${entry.id}: discovery entries carry a description`)
+    assert.ok(entry.summary, `${entry.id}: discovery entries carry a concise summary`)
+    assert.ok(entry.summary.length <= 52, `${entry.id}: summary stays within 52 characters`)
+    assert.ok(collections.has(entry.collection), `${entry.id}: discovery collection is known`)
     assert.match(entry.manifest_url, /^https:\/\//)
     assert.match(entry.raw_base, /^https:\/\//)
     assert.equal(new URL(entry.manifest_url).host, new URL(entry.raw_base).host,
@@ -1095,12 +1156,14 @@ test('catalog is a release-independent discovery index with a baked snapshot flo
   assert.doesNotMatch(refresh, /writeFile\(catalogPath/)
 })
 
-test('Beat Machine discovery entry describes the sequencer', async () => {
+test('Beat Machine discovery entry sells beat-making in one short promise', async () => {
   const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
   const entry = catalog.apps.find((item) => item.id === 'beat-machine')
 
   assert.ok(entry, 'catalog contains Beat Machine')
-  assert.match(entry.description, /32-step sequencer/i)
+  assert.match(entry.summary, /make beats/i)
+  assert.match(entry.summary, /32 steps/i)
+  assert.ok(entry.summary.length <= 52)
   assert.ok(entry.keywords.includes('sequencer'))
   assert.ok(entry.capabilities.some((capability) => /32-step/.test(capability)))
 })

@@ -1,16 +1,18 @@
 import { MANIFEST_SNAPSHOTS } from './manifest-snapshots.js'
 
-// Curated catalog. Each entry points at a public mobius-os repo on
-// the main branch. The web registry stays a release-independent discovery
-// index; these baked entries carry generated manifests for resilient first
-// paint and Browse hydrates the live registry from each manifest_url.
+// Curated catalog. Each entry points at a public mobius-os repo on the main
+// branch. The web registry stays a release-independent discovery index; these
+// baked entries carry generated manifests for resilient first paint and Browse
+// hydrates the live registry from each manifest_url.
 export const CATALOG = [
-  // First screen priority: agent-facing utilities, then broad everyday apps,
-  // then specialist and playful apps. Memory is an optional system app and
-  // Reflection is an ordinary installable app; both stay first because they
-  // explain the platform's agent loop.
+  // `collection` controls the curated browse shelf. `audience` remains useful
+  // discovery metadata and provides the fallback for older catalog entries.
+  // Array order remains the stable order within each shelf.
   {
       id: 'memory',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "A private knowledge graph for your agent.",
       repo: 'mobius-os/app-memory',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-memory/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-memory/main/',
@@ -28,6 +30,9 @@ export const CATALOG = [
     },
   {
       id: 'reflection',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "A morning brief on what Möbius learned.",
       repo: 'mobius-os/app-reflection',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-reflection/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-reflection/main/',
@@ -45,6 +50,9 @@ export const CATALOG = [
     },
   {
       id: 'workflows',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "See what every background agent did.",
       repo: 'mobius-os/app-workflows',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-workflows/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-workflows/main/',
@@ -54,6 +62,9 @@ export const CATALOG = [
     },
   {
       id: 'skills',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "Browse the playbooks behind your agent.",
       repo: 'mobius-os/app-skills',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-skills/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-skills/main/',
@@ -63,6 +74,9 @@ export const CATALOG = [
     },
   {
       id: 'artifacts',
+      audience: 'general',
+      collection: 'create',
+      summary: "Create interactive pages and polished reports.",
       repo: 'mobius-os/app-artifacts',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-artifacts/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-artifacts/main/',
@@ -72,6 +86,9 @@ export const CATALOG = [
     },
   {
       id: 'maps',
+      audience: 'general',
+      collection: 'explore',
+      summary: "Turn place ideas into maps you can keep.",
       repo: 'mobius-os/app-maps',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-maps/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-maps/main/',
@@ -81,6 +98,9 @@ export const CATALOG = [
     },
   {
       id: 'tasks',
+      audience: 'general',
+      collection: 'everyday',
+      summary: "See every scheduled agent check-in.",
       repo: 'mobius-os/app-tasks',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-tasks/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-tasks/main/',
@@ -90,6 +110,9 @@ export const CATALOG = [
     },
   {
       id: 'contribute',
+      audience: 'general',
+      collection: 'developer',
+      summary: "Review and share improvements to Möbius.",
       repo: 'mobius-os/app-contribute',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-contribute/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-contribute/main/',
@@ -106,6 +129,9 @@ export const CATALOG = [
     },
   {
       id: 'notes',
+      audience: 'general',
+      collection: 'everyday',
+      summary: "Markdown notes with checklists, images, and search.",
       repo: 'mobius-os/app-notes',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/',
@@ -115,6 +141,9 @@ export const CATALOG = [
     },
   {
       id: 'news',
+      audience: 'general',
+      collection: 'everyday',
+      summary: "A daily briefing on the topics you care about.",
       repo: 'mobius-os/app-news',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-news/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-news/main/',
@@ -131,6 +160,9 @@ export const CATALOG = [
     },
   {
       id: 'editor',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "Edit any Möbius file yourself or with your agent.",
       repo: 'mobius-os/app-editor',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-editor/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-editor/main/',
@@ -140,6 +172,9 @@ export const CATALOG = [
     },
   {
       id: 'webstudio',
+      audience: 'general',
+      collection: 'create',
+      summary: "Build a website live with your agent.",
       repo: 'mobius-os/app-webstudio',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-webstudio/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-webstudio/main/',
@@ -149,6 +184,9 @@ export const CATALOG = [
     },
   {
       id: 'gym',
+      audience: 'general',
+      collection: 'everyday',
+      summary: "Log workouts by chat and track your progress.",
       repo: 'mobius-os/app-workout',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-workout/main/',
@@ -158,6 +196,9 @@ export const CATALOG = [
     },
   {
       id: 'habits',
+      audience: 'general',
+      collection: 'everyday',
+      summary: "Build lasting routines with streaks and reminders.",
       repo: 'mobius-os/app-habits',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-habits/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-habits/main/',
@@ -167,15 +208,21 @@ export const CATALOG = [
     },
   {
       id: 'beat-machine',
+      audience: 'general',
+      collection: 'play',
+      summary: "Make beats with 32 steps and your own sounds.",
       repo: 'mobius-os/app-beat-machine',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-beat-machine/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-beat-machine/main/',
-      categories: ['creative'],
+      categories: ['creative', 'music'],
       keywords: ['beats', 'sequencer', 'step sequencer', 'patterns', 'music', 'audio', 'recording', 'effects'],
       capabilities: ['sequence 32-step patterns', 'record custom sounds', 'adjust bpm and effects'],
     },
   {
       id: 'atlas',
+      audience: 'general',
+      collection: 'explore',
+      summary: "Mark where you've been on a living 3D globe.",
       repo: 'mobius-os/app-atlas',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-atlas/main/',
@@ -185,6 +232,9 @@ export const CATALOG = [
     },
   {
       id: 'latex',
+      audience: 'general',
+      collection: 'create',
+      summary: "Write polished PDFs with live preview.",
       repo: 'mobius-os/app-latex',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-latex/main/',
@@ -194,6 +244,9 @@ export const CATALOG = [
     },
   {
       id: 'tandem',
+      audience: 'general',
+      collection: 'explore',
+      summary: "Learn languages through made-for-you stories.",
       repo: 'mobius-os/app-tandem',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-tandem/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-tandem/main/',
@@ -210,6 +263,9 @@ export const CATALOG = [
     },
   {
       id: 'cuberun',
+      audience: 'general',
+      collection: 'play',
+      summary: "Chase a high score in a neon 3D world.",
       repo: 'mobius-os/app-cuberun',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-cuberun/main/',
@@ -240,7 +296,7 @@ export const CATALOG_URL =
 // newer than what's running, offer a one-tap update (the same install
 // transaction every other app uses) followed by a reload so the freshly-patched
 // code loads.
-export const STORE_VERSION = '1.15.2'
+export const STORE_VERSION = '1.15.3'
 export const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',
