@@ -485,7 +485,7 @@ test('capability-change 409 exposes the new contract without retrying install', 
   }
 })
 
-test('capability rows describe system prompt, redacted logs, and scoped job generically', async () => {
+test('capability rows describe system prompt, redacted logs, and a server job generically', async () => {
   const { capabilityRows } = await bundle()
   const rows = capabilityRows({
     schema: 1,
@@ -506,12 +506,16 @@ test('capability rows describe system prompt, redacted logs, and scoped job gene
   })
   assert.match(rows.find(row => row.label === 'Agent chats').summary, /every agent chat/)
   assert.match(rows.find(row => row.label === 'Chat history').summary, /structurally redacted/)
-  assert.match(rows.find(row => row.label === 'Background work').summary, /initialization run/)
+  const background = rows.find(row => row.label === 'Background work')
+  assert.equal(background.tag, 'Server job')
+  assert.match(background.summary, /initialization run/)
+  assert.match(background.summary, /reviewed owner-installed code/)
+  assert.match(background.summary, /short-lived app token/)
   assert.match(rows.find(row => row.label === 'Shares its data').summary, /read this app’s private data/)
   assert.ok(rows.every(row => !/Memory app/i.test(row.summary)), 'renderer has no app-specific branch')
 })
 
-test('ordinary background jobs disclose host process authority', async () => {
+test('retired receipt fields do not create a second server-job tier', async () => {
   const { capabilityRows } = await bundle()
   const rows = capabilityRows({
     agent: { skills: [] },
@@ -525,12 +529,12 @@ test('ordinary background jobs disclose host process authority', async () => {
     },
   })
   const background = rows.find(row => row.label === 'Background work')
-  assert.equal(background.tag, 'Host app job')
-  assert.match(background.summary, /legacy host app process/)
-  assert.match(background.summary, /filesystem-API restrictions do not confine/)
+  assert.equal(background.tag, 'Server job')
+  assert.match(background.summary, /Möbius process access/)
+  assert.doesNotMatch(background.summary, /legacy|filesystem-confined/)
 })
 
-test('capability rows disclose embedded agents, provider credentials, and offline behavior', async () => {
+test('capability rows disclose embedded agents, server jobs, and offline behavior', async () => {
   const { capabilityRows } = await bundle()
   const rows = capabilityRows({
     agent: { embeds_agent: true, skills: [] },
@@ -548,7 +552,7 @@ test('capability rows disclose embedded agents, provider credentials, and offlin
     },
   })
   assert.match(rows.find(row => row.label === 'Embedded agent').summary, /agent chat/)
-  assert.match(rows.find(row => row.label === 'Background work').summary, /provider credentials/)
+  assert.equal(rows.find(row => row.label === 'Background work').tag, 'Server job')
   assert.match(rows.find(row => row.label === 'Offline use').summary, /partial offline execution/)
 })
 

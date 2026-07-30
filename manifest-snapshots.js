@@ -26,8 +26,7 @@ export const MANIFEST_SNAPSHOTS = {
       "cross_app_access": "none",
       "share_with_apps": "none",
       "shared_memory": "write",
-      "chat_log_access": "summary",
-      "background_agent": true
+      "chat_log_access": "summary"
     },
     "storage_seeds": {
       "settings.json": {
