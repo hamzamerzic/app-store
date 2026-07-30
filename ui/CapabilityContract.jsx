@@ -126,12 +126,9 @@ export function capabilityRows(contract) {
     const init = background.initialize_on_install
       ? ' and starts an initialization run immediately after install'
       : ''
-    const authority = background.authority === 'scoped_system_job'
-      ? ' It is filesystem-confined to its reviewed data scope, can use the configured agent provider credentials, and receives an app token—not the owner token.'
-      : ' It runs as a legacy host app process; the iframe and filesystem-API restrictions do not confine that process.'
     rows.push(row(
-      'Background work', background.agent ? 'Scoped agent' : 'Host app job',
-      `${timing}${init}.${authority}`,
+      'Background work', 'Server job',
+      `${timing}${init}. It runs as reviewed owner-installed code with Möbius process access and receives a short-lived app token for API calls.`,
       'write',
     ))
   } else {
