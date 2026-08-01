@@ -4,7 +4,7 @@ export const MANIFEST_SNAPSHOTS = {
   "memory": {
     "id": "memory",
     "name": "Memory",
-    "version": "2.1.10",
+    "version": "2.3.5",
     "description": "Build and retrieve an optional graph of durable facts without injecting it into every chat.",
     "author": "mobius-os",
     "license": "MIT",
@@ -26,7 +26,7 @@ export const MANIFEST_SNAPSHOTS = {
       "cross_app_access": "none",
       "share_with_apps": "none",
       "shared_memory": "write",
-      "chat_log_access": "summary"
+      "chat_log_access": "summary_with_deleted"
     },
     "storage_seeds": {
       "settings.json": {
@@ -35,7 +35,11 @@ export const MANIFEST_SNAPSHOTS = {
         "model": null,
         "secondary_agent_mode": "system",
         "fallback_provider": null,
-        "fallback_model": null
+        "fallback_model": null,
+        "live_breadth": 4,
+        "live_depth": 4,
+        "night_breadth": 6,
+        "night_depth": 6
       }
     },
     "schedule": {
@@ -49,7 +53,8 @@ export const MANIFEST_SNAPSHOTS = {
         "react",
         "react-dom",
         "marked",
-        "dompurify"
+        "dompurify",
+        "@openai/apps-sdk-ui/components/Icon"
       ]
     },
     "embeds_agent": false,
@@ -57,6 +62,7 @@ export const MANIFEST_SNAPSHOTS = {
       "memory-core.md",
       "memory.md",
       "memory_search.py",
+      "memory_text_provider.py",
       "memory_runner.py",
       "memory_store.py",
       "memory_graph.py",
@@ -65,6 +71,7 @@ export const MANIFEST_SNAPSHOTS = {
       "domain.js",
       "storage.js",
       "graph/render.jsx",
+      "graph/viewport.mjs",
       "ui/Th.jsx",
       "ui/ImportanceDots.jsx",
       "ui/EmptyConstellation.jsx",
@@ -75,6 +82,7 @@ export const MANIFEST_SNAPSHOTS = {
       "ui/NetworkGlyph.jsx",
       "ui/EffortStepper.jsx",
       "ui/BackgroundAgentList.jsx",
+      "ui/SourceContext.jsx",
       "ui/backgroundAgentOrder.js",
       "ui/ModelPicker.jsx",
       "seed-memory/index.md",
@@ -89,7 +97,7 @@ export const MANIFEST_SNAPSHOTS = {
   "reflection": {
     "id": "reflection",
     "name": "Reflection",
-    "version": "2.8.8",
+    "version": "2.8.17",
     "description": "While you sleep, Möbius learns from recent work, improves its own approach, anticipates what may help next, and leaves a one-page morning brief.",
     "author": "mobius-os",
     "license": "MIT",
@@ -100,7 +108,7 @@ export const MANIFEST_SNAPSHOTS = {
     "permissions": {
       "cross_app_access": "read",
       "share_with_apps": "none",
-      "chat_log_access": "summary"
+      "chat_log_access": "summary_with_deleted"
     },
     "storage_seeds": {
       "settings.json": {
@@ -131,15 +139,20 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
     "embeds_agent": true,
     "source_files": [
       "reflection_runner.py",
+      "operating-contract.md",
+      "reflection_inputs.py",
+      "housekeeping.py",
       "resource_monitor.py",
       "memory_health.py",
+      "tool_friction.py",
       "constants.js",
       "theme.js",
       "domain.js",
@@ -159,10 +172,40 @@ export const MANIFEST_SNAPSHOTS = {
       "ui/SettingsTab.jsx"
     ]
   },
+  "subagents": {
+    "id": "codex",
+    "name": "Subagents",
+    "version": "0.3.0",
+    "description": "Connect and independently enable Claude or Codex subagents, choose provider-specific defaults, and give the Möbius agent one guarded delegation capability.",
+    "author": "mobius-os",
+    "license": "MIT",
+    "homepage": "https://github.com/mobius-os/app-subagents",
+    "entry": "index.jsx",
+    "icon": "icon.png",
+    "offline_capable": false,
+    "permissions": {},
+    "skills": [
+      "subagents.md"
+    ],
+    "source_files": [
+      "models.json",
+      "subagents.md",
+      "subagents.py",
+      "test_subagents.py"
+    ],
+    "runtime": {
+      "imports": [
+        "react",
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
+      ],
+      "esm_deps": []
+    }
+  },
   "workflows": {
     "id": "workflows",
     "name": "Workflows",
-    "version": "2.3.0",
+    "version": "2.3.2",
     "description": "An outcome journal for background work: skim completed outcomes, items that need attention, and each helper's assignment.",
     "author": "mobius-os",
     "license": "MIT",
@@ -182,7 +225,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -196,7 +240,7 @@ export const MANIFEST_SNAPSHOTS = {
   "skills": {
     "id": "skills",
     "name": "Skills",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "Browse and read your agent's skills, and grow them: install from public skill catalogs, or ask the agent to find the right one for you.",
     "author": "mobius-os",
     "license": "MIT",
@@ -216,7 +260,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": [
         "marked",
@@ -232,7 +277,7 @@ export const MANIFEST_SNAPSHOTS = {
   "artifacts": {
     "id": "artifacts",
     "name": "Artifacts",
-    "version": "0.5.6",
+    "version": "0.6.1",
     "description": "Browse, preview, version, share, view, copy, and download interactive pages and polished documents created in Möbius chats.",
     "author": "mobius-os",
     "license": "MIT",
@@ -251,25 +296,42 @@ export const MANIFEST_SNAPSHOTS = {
       "artifacts-core.md",
       "artifacts.md",
       "domain.js",
+      "linkPreview.js",
+      "source-syntax.js",
       "storage.js",
       "theme.js",
       "preview/ArtifactFrame.jsx",
+      "preview/artifactLinks.js",
       "ui/ArtifactCard.jsx",
+      "ui/ArtifactThumbnail.jsx",
+      "ui/catalogSnapshot.js",
+      "ui/clipboard.js",
       "ui/detailSync.js",
       "ui/Detail.jsx",
       "ui/Empty.jsx",
       "ui/Gallery.jsx",
       "ui/Icons.jsx",
       "ui/ShareSheet.jsx",
+      "ui/SourceViewer.jsx",
       "ui/sharePolling.js",
+      "ui/skillIcon.js",
       "ui/VersionTimeline.jsx"
-    ]
+    ],
+    "runtime": {
+      "imports": [
+        "react",
+        "react-dom",
+        "@codemirror/state",
+        "@codemirror/view",
+        "@openai/apps-sdk-ui/components/Icon"
+      ]
+    }
   },
   "maps": {
     "id": "maps",
     "previous_id": "mapbook",
     "name": "Maps",
-    "version": "0.1.10",
+    "version": "0.2.0",
     "description": "Visualise and keep maps created in Möbius, with a location skill and links back to their source conversations.",
     "author": "mobius-os",
     "license": "MIT",
@@ -292,15 +354,24 @@ export const MANIFEST_SNAPSHOTS = {
     "skills": [
       "maps-app.md"
     ],
+    "static_assets": {
+      "map-viewer-0.2.0.js": "map-viewer-0.2.0.js",
+      "vendor/leaflet-1.9.4.css": "vendor/leaflet-1.9.4.css",
+      "vendor/leaflet-1.9.4.js": "vendor/leaflet-1.9.4.js"
+    },
     "source_files": [
       "clipboard.js",
       "domain.js",
+      "linkPreview.js",
+      "SharedMapDetail.jsx",
       "publicMap.js",
       "share.js",
       "shareSheet.jsx",
       "storage.js",
       "skillIcon.js",
       "theme.js",
+      "viewerAssets.js",
+      "LEAFLET-LICENSE.txt",
       "maps-app.md",
       "scripts/add_map.py",
       "scripts/maps_client.py"
@@ -328,7 +399,8 @@ export const MANIFEST_SNAPSHOTS = {
       "imports": [
         "react",
         "react-dom",
-        "date-fns"
+        "date-fns",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -341,7 +413,7 @@ export const MANIFEST_SNAPSHOTS = {
   "contribute": {
     "id": "contribute",
     "name": "Contribute",
-    "version": "0.5.2",
+    "version": "0.5.21",
     "description": "See what your agent has proposed upstream — pull requests, issues, and comments across the Möbius ecosystem, from prepared to merged.",
     "author": "mobius-os",
     "license": "MIT",
@@ -365,16 +437,18 @@ export const MANIFEST_SNAPSHOTS = {
         "react",
         "react-dom",
         "marked",
-        "dompurify"
+        "dompurify",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
     "schedule": {
-      "default": "0 * * * *",
+      "default": "*/15 * * * *",
       "job": "job.sh"
     },
     "skills": [
-      "contributing.md"
+      "contributing.md",
+      "review-followup.md"
     ],
     "source_files": [
       "theme.js",
@@ -384,13 +458,18 @@ export const MANIFEST_SNAPSHOTS = {
       "refresh.js",
       "stack.js",
       "source-map.js",
+      "autopilot.js",
       "diff.js",
       "parse-unified-diff.js",
       "api.js",
       "github-connection.js",
       "storage.js",
+      "prepared_reconcile.py",
+      "agent_snapshot.py",
       "contributing.md",
+      "review-followup.md",
       "ui/Icons.jsx",
+      "ui/BatchAction.jsx",
       "ui/ConnectionCard.jsx",
       "ui/MarkdownView.jsx",
       "ui/DiffView.jsx",
@@ -430,7 +509,8 @@ export const MANIFEST_SNAPSHOTS = {
         "@lezer/highlight",
         "katex",
         "marked",
-        "dompurify"
+        "dompurify",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -459,8 +539,8 @@ export const MANIFEST_SNAPSHOTS = {
   "news": {
     "id": "news",
     "name": "News",
-    "version": "1.14.11",
-    "description": "A daily AI-curated news digest you can tune by topic, schedule, and editorial brief.",
+    "version": "1.15.3",
+    "description": "A personal daily news digest shaped by your interests, source mix, and listening preferences.",
     "offline_capable": true,
     "embeds_agent": true,
     "author": "mobius-os",
@@ -471,6 +551,7 @@ export const MANIFEST_SNAPSHOTS = {
     "source_files": [
       "report-schema.mjs",
       "constants.js",
+      "preferences.js",
       "theme.js",
       "domain.js",
       "storage.js",
@@ -480,6 +561,9 @@ export const MANIFEST_SNAPSHOTS = {
       "ui/ReportQuestions.jsx",
       "ui/ReportReader.jsx",
       "ui/ReportsTab.jsx",
+      "ui/ListenControls.jsx",
+      "ui/PreferenceFields.jsx",
+      "ui/SetupFlow.jsx",
       "ui/ModelPicker.jsx",
       "ui/EffortStepper.jsx",
       "ui/BackgroundAgentList.jsx",
@@ -494,6 +578,7 @@ export const MANIFEST_SNAPSHOTS = {
     },
     "storage_seeds": {
       "system-prompt.md": "system-prompt.md",
+      "prompt-additions.txt": "prompt-additions.txt",
       "topics.txt": "topics.txt",
       "agent.json": {
         "primary_agent_mode": "system",
@@ -508,6 +593,21 @@ export const MANIFEST_SNAPSHOTS = {
       "schedule.json": {
         "hour": 10,
         "minute": 0
+      },
+      "preferences.json": {
+        "version": 1,
+        "onboarding_completed": false,
+        "source_types": [
+          "mainstream",
+          "independent"
+        ],
+        "include_sources": "",
+        "exclude_sources": "",
+        "tts": {
+          "enabled": false,
+          "language": "english",
+          "voice": "alba"
+        }
       }
     },
     "offline": {
@@ -523,7 +623,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     }
@@ -590,7 +691,8 @@ export const MANIFEST_SNAPSHOTS = {
         "@codemirror/lang-markdown",
         "@lezer/highlight",
         "katex",
-        "pdfjs-dist"
+        "pdfjs-dist",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     }
@@ -598,7 +700,7 @@ export const MANIFEST_SNAPSHOTS = {
   "webstudio": {
     "id": "webstudio",
     "name": "Web Studio",
-    "version": "0.13.3",
+    "version": "0.13.5",
     "description": "Build a website with the agent and preview it live in an in-app browser.",
     "author": "mobius-os",
     "license": "MIT",
@@ -636,7 +738,8 @@ export const MANIFEST_SNAPSHOTS = {
         "@codemirror/state",
         "@codemirror/view",
         "@codemirror/commands",
-        "@codemirror/language"
+        "@codemirror/language",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -689,7 +792,7 @@ export const MANIFEST_SNAPSHOTS = {
     "id": "workout",
     "previous_id": "gym",
     "name": "Workout",
-    "version": "2.8.4",
+    "version": "2.9.1",
     "description": "Log workouts by chatting, and it tracks your PRs, trends, and streaks.",
     "author": "mobius-os",
     "license": "MIT",
@@ -730,7 +833,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -745,7 +849,7 @@ export const MANIFEST_SNAPSHOTS = {
   "habits": {
     "id": "habits",
     "name": "Habits",
-    "version": "1.0.8",
+    "version": "1.0.10",
     "description": "Track daily habits with streaks, a strength score, a calendar heatmap, and per-habit reminders.",
     "author": "mobius-os",
     "license": "MIT",
@@ -773,7 +877,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "recharts"
+        "recharts",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -812,7 +917,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -830,7 +936,7 @@ export const MANIFEST_SNAPSHOTS = {
   "atlas": {
     "id": "atlas",
     "name": "Atlas",
-    "version": "1.9.14",
+    "version": "1.9.15",
     "description": "Spin the globe, tap the countries you've visited, and watch your map fill in.",
     "author": "mobius-os",
     "license": "MIT AND CC-BY-3.0-IGO",
@@ -860,7 +966,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": [
         "d3-geo"
@@ -871,15 +978,19 @@ export const MANIFEST_SNAPSHOTS = {
       "theme.js",
       "domain.js",
       "storage.js",
+      "earthTexture.js",
+      "earthTextureDataA.js",
+      "earthTextureDataB.js",
       "ui/Globe.jsx",
       "ui/BottomSheet.jsx",
-      "ui/SyncPill.jsx"
+      "ui/SyncPill.jsx",
+      "ui/earthRenderer.js"
     ]
   },
   "latex": {
     "id": "latex",
     "name": "LaTeX",
-    "version": "2.15.3",
+    "version": "2.15.5",
     "description": "Write and compile LaTeX with live PDF preview and an agent that drafts your .tex.",
     "author": "mobius-os",
     "license": "MIT",
@@ -941,7 +1052,8 @@ export const MANIFEST_SNAPSHOTS = {
         "@codemirror/state",
         "@codemirror/view",
         "@codemirror/commands",
-        "@codemirror/language"
+        "@codemirror/language",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     },
@@ -958,7 +1070,7 @@ export const MANIFEST_SNAPSHOTS = {
   "tandem": {
     "id": "tandem",
     "name": "Tandem",
-    "version": "0.14.4",
+    "version": "0.14.5",
     "description": "Split-pane bilingual reader for language learning. Wide screens show the languages left/right; phones and narrow windows stack them top/bottom. The panes sync-scroll and the divider resizes them. Choose languages and level, then describe the story you want in one free-form prompt — ask for a fresh story or to continue an earlier one. Pick the generation agent (Claude or OpenAI Codex) in settings; tap a word for its exact glossary match or honest aligned-sentence context.",
     "offline_capable": true,
     "offline": {
@@ -1008,7 +1120,8 @@ export const MANIFEST_SNAPSHOTS = {
     "runtime": {
       "imports": [
         "react",
-        "react-dom"
+        "react-dom",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     }
@@ -1069,7 +1182,8 @@ export const MANIFEST_SNAPSHOTS = {
     },
     "runtime": {
       "imports": [
-        "react"
+        "react",
+        "@openai/apps-sdk-ui/components/Icon"
       ],
       "esm_deps": []
     }

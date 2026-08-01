@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated": "2026-07-29",
+  "updated": "2026-08-01",
   "note": "Web registry of Mobius App Store discovery entries. The store fetches this at mount so membership and concise browse copy can update without a Store release. Each entry points to its app repo and live mobius.json; audience and collection shape the curated shelves, while summary is short card copy. Version-coupled manifest snapshots belong only in manifest-snapshots.js for the baked offline first-paint floor. Keep catalog.json and constants.js membership in sync.",
   "apps": [
     {
@@ -82,6 +82,36 @@
       "audience": "developer",
       "collection": "developer",
       "summary": "A morning brief on what Möbius learned."
+    },
+    {
+      "id": "subagents",
+      "name": "Subagents",
+      "description": "Connect and independently enable Claude or Codex subagents, choose provider-specific defaults, and give the Möbius agent one guarded delegation capability.",
+      "repo": "mobius-os/app-subagents",
+      "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json",
+      "raw_base": "https://raw.githubusercontent.com/mobius-os/app-subagents/main/",
+      "categories": [
+        "system",
+        "agents"
+      ],
+      "keywords": [
+        "subagents",
+        "claude",
+        "codex",
+        "delegation",
+        "helper agents",
+        "provider defaults",
+        "model selection",
+        "reasoning effort"
+      ],
+      "capabilities": [
+        "enable Claude and Codex independently for delegated work",
+        "choose provider-specific model and effort defaults",
+        "provide one guarded subagent delegation skill"
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "Choose which agents Möbius can delegate to."
     },
     {
       "id": "workflows",
