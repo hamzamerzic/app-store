@@ -128,6 +128,27 @@ export function canonicalIdentityKey(url, manifestId) {
   return `${base}#manifest-id=${manifestId}`
 }
 
+// Trusted catalog apps are one app per mobius-os repository. The platform may
+// deliberately pin an installed row to a reviewed commit while the catalog
+// continues to advertise `main`; the revision is update provenance, not app
+// identity. Keep this deliberately as narrow as the backend's matching rule:
+// only a root manifest in raw.githubusercontent.com/mobius-os/<repo>/<ref>
+// qualifies. A manifest in a repo subdirectory remains ref-sensitive because
+// one repository can host multiple apps there.
+function trustedCatalogRepoBase(urlOrIdentity) {
+  if (!urlOrIdentity) return ''
+  let parsed
+  try {
+    parsed = new URL(String(urlOrIdentity).split('#', 1)[0].split('?', 1)[0])
+  } catch {
+    return ''
+  }
+  if (parsed.hostname !== 'raw.githubusercontent.com') return ''
+  const parts = parsed.pathname.split('/').filter(Boolean)
+  if (parts.length !== 3 || parts[0] !== 'mobius-os') return ''
+  return `${parsed.origin}/${parts[0]}/${parts[1]}`
+}
+
 // Look up an installed App row that corresponds to the catalog entry.
 // Canonical manifest identity is the only source of truth; old platform-owned
 // rows are repaired by the backend install path when the user installs the
@@ -135,7 +156,17 @@ export function canonicalIdentityKey(url, manifestId) {
 export function findInstalled(installed, item) {
   const manifestId = item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
-  return installed.find(a => a.manifest_url === canonical) || null
+  const exact = installed.find(a => a.manifest_url === canonical)
+  if (exact) return exact
+
+  const repoBase = trustedCatalogRepoBase(canonical)
+  if (!repoBase) return null
+  const suffix = `#manifest-id=${manifestId}`
+  return installed.find((app) => {
+    const identity = app.manifest_url || ''
+    return identity.endsWith(suffix) &&
+      trustedCatalogRepoBase(identity) === repoBase
+  }) || null
 }
 
 export function installedVersionFor(item, installedVersions, installedApp) {
