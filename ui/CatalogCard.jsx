@@ -83,7 +83,7 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
     updateNotice?.kind === 'conflict'
   const noticeDisabled = busy || blocked
   const reviewLabel = lifecycle.actionKind === 'install'
-    ? 'Review & install'
+    ? 'Review & Install'
     : lifecycle.actionKind === 'update'
     ? 'Update'
     : lifecycle.actionLabel

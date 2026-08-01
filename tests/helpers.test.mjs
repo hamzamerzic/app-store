@@ -64,6 +64,31 @@ test('findInstalled matches canonical manifest identity, not slug', async () => 
   assert.equal(findInstalled(installed, item), installed[0])
 })
 
+test('findInstalled treats trusted catalog commit pins as the same installed app', async () => {
+  const { findInstalled } = await bundle()
+  const pinned = {
+    id: 7,
+    slug: 'memory',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-memory/0123456789abcdef0123456789abcdef01234567#manifest-id=memory',
+    version: '1.0.0',
+  }
+  const catalogItem = {
+    id: 'memory',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-memory/main/mobius.json',
+    manifest: { id: 'memory' },
+  }
+
+  assert.equal(findInstalled([pinned], catalogItem), pinned)
+  assert.equal(findInstalled([{
+    ...pinned,
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-reflection/main#manifest-id=memory',
+  }], catalogItem), null)
+  assert.equal(findInstalled([{
+    ...pinned,
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-memory/main/examples#manifest-id=memory',
+  }], catalogItem), null)
+})
+
 test('appIcon paints installed icons directly and keeps remote icons as discovery fallback', async () => {
   const { appIcon } = await bundle()
   const catalogItem = {
@@ -1084,6 +1109,8 @@ test('busy labels stay tied to the action that started', async () => {
   assert.ok(source.includes("const startedActionKind = _opts?.isUpdate ? 'update' : 'install'"))
   assert.ok(source.includes('setBusyActionKind(startedActionKind)'))
   assert.ok(cardSource.includes('busyActionKind || lifecycle.actionKind'))
+  assert.ok(cardSource.includes("? 'Review & Install'"))
+  assert.ok(!cardSource.includes("'Review & install'"))
   assert.ok(detailSource.includes('busyActionKind || lifecycle.actionKind'))
 })
 
