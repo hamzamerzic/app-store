@@ -49,6 +49,18 @@ export const CATALOG = [
       },
     },
   {
+      id: 'subagents',
+      audience: 'developer',
+      collection: 'developer',
+      summary: "Choose which agents Möbius can delegate to.",
+      repo: 'mobius-os/app-subagents',
+      manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json',
+      raw_base: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/',
+      categories: ['system', 'agents'],
+      keywords: ['subagents', 'claude', 'codex', 'delegation', 'helper agents', 'provider defaults', 'model selection', 'reasoning effort'],
+      capabilities: ['enable Claude and Codex independently for delegated work', 'choose provider-specific model and effort defaults', 'provide one guarded subagent delegation skill'],
+    },
+  {
       id: 'workflows',
       audience: 'developer',
       collection: 'developer',

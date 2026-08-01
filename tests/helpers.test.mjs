@@ -1218,3 +1218,16 @@ test('Maps discovery entry exposes saved-map and skill capabilities', async () =
   assert.ok(entry.capabilities.some((capability) => /source chats/.test(capability)))
   assert.equal(entry.manifest, undefined)
 })
+
+test('Subagents discovery entry exposes guarded provider delegation', async () => {
+  const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
+  const entry = catalog.apps.find((item) => item.id === 'subagents')
+
+  assert.ok(entry, 'catalog contains Subagents')
+  assert.equal(entry.repo, 'mobius-os/app-subagents')
+  assert.equal(entry.collection, 'developer')
+  assert.ok(entry.keywords.includes('claude'))
+  assert.ok(entry.keywords.includes('codex'))
+  assert.ok(entry.capabilities.some((capability) => /guarded subagent delegation/.test(capability)))
+  assert.equal(entry.manifest, undefined)
+})
