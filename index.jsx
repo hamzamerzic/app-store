@@ -1028,7 +1028,7 @@ export default function App({ appId, token }) {
           raw_base: item.raw_base,
           token,
         }),
-        loadUpdateCandidatePreview(installedApp.id, token).then(
+        loadUpdateCandidatePreview(installedApp.id, item.manifest_url, token).then(
           (preview) => ({ preview, error: '' }),
           (error) => ({
             preview: null,

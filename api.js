@@ -502,8 +502,11 @@ export async function loadUpdatePreview(appId, token) {
 // loadUpdatePreview above: that endpoint describes an upstream commit already
 // recorded by an attempted update (used for conflict resolution), while this
 // one fetches the incoming release before anything is applied.
-export async function loadUpdateCandidatePreview(appId, token) {
-  const res = await fetch(`/api/apps/${appId}/update-candidate-preview`, {
+export async function loadUpdateCandidatePreview(appId, manifestUrl, token) {
+  const query = manifestUrl
+    ? `?manifest_url=${encodeURIComponent(manifestUrl)}`
+    : ''
+  const res = await fetch(`/api/apps/${appId}/update-candidate-preview${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   return await readJsonOrThrow(res, 'Update changes could not be loaded')

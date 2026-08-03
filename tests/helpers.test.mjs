@@ -638,7 +638,9 @@ test('catalog updates open a read-only review before applying, binding reviewed 
   const uninstallSource = await readFile(join(root, '..', 'ui', 'UninstallConfirmModal.jsx'), 'utf8')
   assert.ok(indexSource.includes('const handleCatalogUpdate = useCallback'))
   assert.ok(indexSource.includes('onUpdate={handleCatalogUpdate}'))
-  assert.ok(indexSource.includes('loadUpdateCandidatePreview(installedApp.id, token)'))
+  assert.ok(indexSource.includes(
+    'loadUpdateCandidatePreview(installedApp.id, item.manifest_url, token)',
+  ))
   assert.ok(indexSource.includes('capabilityDiffNeedsReview('))
   // Every update now opens a read-only review instead of applying on first tap;
   // the inline one-tap apply path and its access-blocked toast are both gone.
@@ -657,6 +659,37 @@ test('catalog updates open a read-only review before applying, binding reviewed 
   assert.ok(cardSource.includes("? 'Update'"))
   assert.match(uninstallSource, /kept\s+temporarily for recovery/)
   assert.match(uninstallSource, /shared files.*not erased/)
+})
+
+test('candidate review requests the exact catalog manifest selected by the user', async () => {
+  const { loadUpdateCandidatePreview } = await import(
+    pathToFileURL(join(root, '..', 'api.js'))
+  )
+  const oldFetch = globalThis.fetch
+  let requested = ''
+  globalThis.fetch = async (url) => {
+    requested = String(url)
+    return new Response(JSON.stringify({
+      app_id: 80,
+      upstream_version: '2.0.0',
+      upstream_diff: '',
+      source_digest: 'a'.repeat(64),
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    const manifestUrl = (
+      'https://raw.githubusercontent.com/mobius-os/' +
+      'app-contribute/main/mobius.json'
+    )
+    await loadUpdateCandidatePreview(80, manifestUrl, 'token')
+    assert.equal(
+      requested,
+      '/api/apps/80/update-candidate-preview?manifest_url=' +
+        encodeURIComponent(manifestUrl),
+    )
+  } finally {
+    globalThis.fetch = oldFetch
+  }
 })
 
 test('a conflicting apply remains visible as an explicit unchanged result', async () => {
