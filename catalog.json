@@ -45,6 +45,35 @@
       "summary": "A private knowledge graph for your agent."
     },
     {
+      "id": "connections",
+      "name": "Connections",
+      "description": "Add remote MCP services once and both agent runtimes can use them — with live health, honest per-message cost, and curated suggestions.",
+      "repo": "mobius-os/app-connections",
+      "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-connections/main/mobius.json",
+      "raw_base": "https://raw.githubusercontent.com/mobius-os/app-connections/main/",
+      "categories": [
+        "system",
+        "agents"
+      ],
+      "keywords": [
+        "mcp",
+        "connections",
+        "connectors",
+        "remote tools",
+        "agent capabilities",
+        "integrations",
+        "tool cost"
+      ],
+      "capabilities": [
+        "manage MCP connections",
+        "verified connection suggestions",
+        "per-message cost visibility"
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "Give your agent new remote capabilities, with honest costs."
+    },
+    {
       "id": "reflection",
       "name": "Reflection",
       "description": "While you sleep, Möbius reviews the system, proposes improvements, and leaves a one-page morning brief.",
