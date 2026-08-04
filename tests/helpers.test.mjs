@@ -2,32 +2,44 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import { createRequire } from 'node:module'
 import test from 'node:test'
 
-const execFileAsync = promisify(execFile)
 const root = dirname(fileURLToPath(import.meta.url))
 const buildDir = join(root, '.build')
 const bundled = join(buildDir, 'index.mjs')
 const reactStub = join(root, 'react-stub.mjs')
 const iconStub = join(root, 'sdk-icon-stub.mjs')
-const esbuildBin = process.env.ESBUILD_BIN || 'esbuild'
+
+// Möbius compiles mini-apps with Rolldown, so the tests bundle the same way.
+// CI points MOBIUS_FRONTEND_NODE_MODULES at the shell's installed frontend;
+// outside CI, a local install resolves it normally.
+async function loadRolldown() {
+  const frontend = process.env.MOBIUS_FRONTEND_NODE_MODULES
+  if (!frontend) return import('rolldown')
+  const requireFromFrontend = createRequire(join(frontend, 'package.json'))
+  return import(pathToFileURL(requireFromFrontend.resolve('rolldown')).href)
+}
 
 async function bundle() {
   await rm(buildDir, { recursive: true, force: true })
   await mkdir(buildDir, { recursive: true })
-  await execFileAsync(esbuildBin, [
-    join(root, '..', 'index.jsx'),
-    '--bundle',
-    '--format=esm',
-    '--platform=node',
-    '--jsx=automatic',
-    `--alias:react=${reactStub}`,
-    `--alias:react/jsx-runtime=${reactStub}`,
-    `--alias:@openai/apps-sdk-ui/components/Icon=${iconStub}`,
-    `--outfile=${bundled}`,
-  ])
+  const { rolldown } = await loadRolldown()
+  const build = await rolldown({
+    input: join(root, '..', 'index.jsx'),
+    platform: 'node',
+    tsconfig: false,
+    resolve: {
+      alias: {
+        'react/jsx-runtime': reactStub,
+        react: reactStub,
+        '@openai/apps-sdk-ui/components/Icon': iconStub,
+      },
+    },
+    transform: { jsx: 'react-jsx' },
+  })
+  await build.write({ file: bundled, format: 'es' })
+  await build.close()
   return import(pathToFileURL(bundled))
 }
 
