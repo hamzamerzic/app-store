@@ -32,7 +32,7 @@ export const CATALOG = [
       id: 'connections',
       audience: 'developer',
       collection: 'developer',
-      summary: "Give your agent new remote capabilities, with honest costs.",
+      summary: "Give your agent remote tools, with honest costs.",
       repo: 'mobius-os/app-connections',
       manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-connections/main/mobius.json',
       raw_base: 'https://raw.githubusercontent.com/mobius-os/app-connections/main/',
