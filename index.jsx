@@ -31,6 +31,7 @@ import {
   isSystemCatalogItem,
   manifestCapabilityRows,
   semverCmp,
+  shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
 } from './domain.js'
 import {
@@ -86,6 +87,7 @@ export {
   isTrustedHost,
   scheduleSummary,
   semverCmp,
+  shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
   validateManifestUrl,
 } from './domain.js'
@@ -396,16 +398,17 @@ export default function App({ appId, token }) {
           entries = [...merged.values()]
         }
         if (cancelled) return
-        // Hydrate entries that do not already carry a validated manifest
-        // snapshot from catalog.json. The registry is the hot path; per-app
-        // manifest fetches are the backwards-compatible fallback for older or
-        // partial registries. Installed apps get a live re-check below so stale
-        // snapshots cannot hide an update after a release lands.
+        // A baked manifest gives every discovery card a fast first paint, but
+        // it must not freeze an installed app at the last Store release. Fetch
+        // the live manifest for installed apps as well, so semver detection
+        // still works when the git-native update probe is unavailable.
         const hydrated = await mapWithConcurrency(
           entries,
           MANIFEST_FETCH_CONCURRENCY,
           async (c) => {
-            if (c.manifest) return { ...c, error: null }
+            if (!shouldRefreshCatalogManifest(c, apps)) {
+              return { ...c, error: null }
+            }
             try {
               const manifest = await fetchManifest(c.manifest_url, token)
               return { ...c, manifest, error: null }

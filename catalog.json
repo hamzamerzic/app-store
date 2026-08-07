@@ -27,7 +27,10 @@
         "read text aloud on-device",
         "clone your voice",
         "pick a voice other apps read in"
-      ]
+      ],
+      "audience": "general",
+      "collection": "everyday",
+      "summary": "Give your agent an on-device voice."
     },
     {
       "id": "memory",

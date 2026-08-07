@@ -169,6 +169,14 @@ export function findInstalled(installed, item) {
   }) || null
 }
 
+// A baked manifest gives an uninstalled discovery card a fast, offline-safe
+// first paint. It cannot be the final version source for an installed app:
+// once a release lands, refresh that app's live manifest so the semver fallback
+// continues to surface an update if the git-native probe is unavailable.
+export function shouldRefreshCatalogManifest(item, installed = []) {
+  return !item?.manifest || Boolean(findInstalled(installed, item))
+}
+
 export function installedVersionFor(item, installedVersions, installedApp) {
   // The installed App row's persisted version is the authoritative source —
   // the backend writes App.version on every install + update path. The local

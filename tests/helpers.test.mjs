@@ -101,6 +101,24 @@ test('findInstalled treats trusted catalog commit pins as the same installed app
   }], catalogItem), null)
 })
 
+test('installed catalog apps refresh their live manifest for update detection', async () => {
+  const { shouldRefreshCatalogManifest } = await bundle()
+  const item = {
+    id: 'beat-machine',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-beat-machine/main/mobius.json',
+    manifest: { id: 'beat-machine', version: '1.0.16' },
+  }
+  const installed = [{
+    id: 55,
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-beat-machine/main#manifest-id=beat-machine',
+    version: '1.0.14',
+  }]
+
+  assert.equal(shouldRefreshCatalogManifest(item, installed), true)
+  assert.equal(shouldRefreshCatalogManifest(item, []), false)
+  assert.equal(shouldRefreshCatalogManifest({ ...item, manifest: null }, []), true)
+})
+
 test('appIcon paints installed icons directly and keeps remote icons as discovery fallback', async () => {
   const { appIcon } = await bundle()
   const catalogItem = {
