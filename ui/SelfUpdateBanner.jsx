@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react'
-import { STORE_SELF, STORE_VERSION } from '../constants.js'
-import { semverCmp } from '../domain.js'
-import { installApp, previewApp } from '../api.js'
+import { STORE_SELF } from '../constants.js'
+import { fetchUpdateCheck, installApp, previewApp } from '../api.js'
 import { CapabilityContract } from './CapabilityContract.jsx'
 
 // Self-update banner. The store is bootstrapped separately from its catalog
-// grid, so it checks for its OWN updates here: fetch the published manifest
-// once, and when that version is newer than the running STORE_VERSION, offer a
-// one-tap update that runs the same install transaction every other app uses,
-// then prompt a reload so the freshly-patched code loads. Renders null when
-// current.
+// grid, so it checks for its OWN updates here: fetch the published manifest,
+// then compare it with this app's recorded upstream source. The version remains
+// a human label only. Renders null when current or verification is unavailable.
 export function SelfUpdateBanner({ appId, token }) {
   const [review, setReview] = useState(null)
   const [showReview, setShowReview] = useState(false)
-  const [installedVer, setInstalledVer] = useState(null) // DB version of THIS app row
+  const [updateCheck, setUpdateCheck] = useState(null)
   const [phase, setPhase] = useState('idle')   // idle | updating | done | conflict | error
   const [msg, setMsg] = useState('')
 
@@ -24,23 +21,13 @@ export function SelfUpdateBanner({ appId, token }) {
         if (!cancelled) setReview({ status: 'ready', preview, error: '' })
       })
       .catch(() => {})   // a failed self-check is silent — never block the grid
-    // The DB row's version is the ground truth for "what is installed".
-    // The baked STORE_VERSION constant is only what is RUNNING — comparing
-    // the constant against the manifest loops forever if a release ever
-    // bumps mobius.json without the constant (which happened: 1.4.22
-    // shipped carrying STORE_VERSION '1.4.21', so every update "succeeded"
-    // and the banner came right back). DB-vs-manifest cannot loop: a
-    // successful install makes them equal.
-    fetch(`/api/apps/${appId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => (r.ok ? r.json() : null))
-      .then(a => { if (!cancelled && a && a.version) setInstalledVer(a.version) })
-      .catch(() => {})
+    fetchUpdateCheck(appId, token)
+      .then(check => { if (!cancelled) setUpdateCheck(check) })
     return () => { cancelled = true }
   }, [appId, token])
 
   const latest = review?.preview?.manifest
-  const runningOrInstalled = installedVer || STORE_VERSION
-  const hasUpdate = latest && semverCmp(runningOrInstalled, latest.version) < 0
+  const hasUpdate = latest && updateCheck?.available === true
   if (phase !== 'done' && phase !== 'conflict' && !hasUpdate) return null
 
   const onUpdate = async () => {

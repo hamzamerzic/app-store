@@ -160,7 +160,7 @@ async function mapWithConcurrency(items, limit, mapper) {
 }
 
 // Probe GET /api/apps/{id}/update-check for the given installed rows and return
-// a { [numericAppId]: { available, pendingUpdateState, upstreamVersion } } map.
+// a { [numericAppId]: source-provenance facts } map.
 // bounded pool as the manifest refetch. fetchUpdateCheck never throws — it
 // degrades to null — so this resolves cleanly even when the endpoint 404s on an
 // older backend; callers merge the answered ids and leave the rest on the
@@ -176,7 +176,7 @@ async function fetchUpdateChecksFor(rows, token) {
   for (const r of results) {
     // A transport/404 failure is not a fresh state answer. Preserve any prior
     // durable conflict/replay state until a later successful check replaces it;
-    // a first-load miss still has no key and naturally falls back to semver.
+    // a first-load miss has no key and never invents an update from semver.
     if (r.check !== null) out[r.id] = r.check
   }
   return out
@@ -189,7 +189,10 @@ function sameUpdateCheck(left, right) {
   }
   return left.available === right.available &&
     left.pendingUpdateState === right.pendingUpdateState &&
-    left.upstreamVersion === right.upstreamVersion
+    left.upstreamVersion === right.upstreamVersion &&
+    left.installedSourceRevision === right.installedSourceRevision &&
+    left.candidateSourceDigest === right.candidateSourceDigest &&
+    left.checkedAt === right.checkedAt
 }
 
 function knownPendingUpdateState(check) {
@@ -213,7 +216,7 @@ export function mergeUpdateChecks(prev, incoming) {
     let value = incoming[k]
     if (value?.pendingUpdateState === 'unknown') {
       // Git could not classify the current receipt. Keep the new availability
-      // and version facts, but never let uncertainty erase a previously known
+      // and provenance facts, but never let uncertainty erase a previously known
       // durable resolution/replay phase.
       const priorState = knownPendingUpdateState(prev[k])
       if (priorState) value = { ...value, pendingUpdateState: priorState }
@@ -266,7 +269,8 @@ export default function App({ appId, token }) {
   const [installedVersions, setInstalledVersions] = useState({})
   // Git-native update state per installed app, keyed by numeric app id. Each
   // answered check carries availability and the pending resolution/replay
-  // phase; a missing/null answer is unknown and falls back to semver.
+  // phase; a missing/null answer is unknown and never becomes a version-based
+  // update guess.
   const [updateChecks, setUpdateChecks] = useState({})
   const [setupCompletions, setSetupCompletions] = useState(() => readSetupCompletions())
   const [systemSetupComplete, setSystemSetupComplete] = useState(() => readSystemSetupReady())
@@ -400,8 +404,8 @@ export default function App({ appId, token }) {
         if (cancelled) return
         // A baked manifest gives every discovery card a fast first paint, but
         // it must not freeze an installed app at the last Store release. Fetch
-        // the live manifest for installed apps as well, so semver detection
-        // still works when the git-native update probe is unavailable.
+        // the live manifest for installed apps as well so human-facing release
+        // labels remain current beside the authoritative source check.
         const hydrated = await mapWithConcurrency(
           entries,
           MANIFEST_FETCH_CONCURRENCY,
@@ -427,8 +431,8 @@ export default function App({ appId, token }) {
         // forget on purpose: a slow or absent (404) endpoint must never gate the
         // skeleton clear in `finally`, so we do NOT await it here. fetchUpdate
         // ChecksFor never rejects (fetchUpdateCheck degrades to null), so no
-        // unhandled rejection escapes; until these land the semver compare drives
-        // the badge, and when they land they refine it in place.
+        // unhandled rejection escapes; until these land the app remains usable,
+        // and when they land they are the sole update authority.
         const checkRows = installedTargets
           .map((c) => findInstalled(apps, c))
           .filter(Boolean)

@@ -121,7 +121,7 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
 
   // Installed icons are same-origin, downscaled, and browser-cacheable. IconBox
   // prioritises this URL over the remote catalog copy so it is available as an
-  // <img> src on the first render instead of popping in after an effect.
+  // image URL on the first render instead of popping in after an effect.
   const itemWithIcon = storeInstalled
     ? { ...item, installed_icon_url: installedIconUrl(storeInstalled) }
     : item

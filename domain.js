@@ -170,9 +170,9 @@ export function findInstalled(installed, item) {
 }
 
 // A baked manifest gives an uninstalled discovery card a fast, offline-safe
-// first paint. It cannot be the final version source for an installed app:
-// once a release lands, refresh that app's live manifest so the semver fallback
-// continues to surface an update if the git-native probe is unavailable.
+// first paint. Installed apps still refresh their live manifest so their
+// human-facing labels stay current; source provenance remains the only update
+// authority.
 export function shouldRefreshCatalogManifest(item, installed = []) {
   return !item?.manifest || Boolean(findInstalled(installed, item))
 }
@@ -229,14 +229,10 @@ export function appLifecycleFor(item, {
         : (installedApp && !setupCompletions[String(installedApp.id)])
     )
   )
-  // Git-native update signal from GET /api/apps/{id}/update-check, keyed by the
-  // installed row's numeric id. A positive answer catches source releases that
-  // forgot to bump mobius.json. A negative answer only proves that the declared
-  // source tree is unchanged: a versioned package can still change static
-  // assets, seeds, icons, jobs, or manifest metadata outside that tree. Keep the
-  // semver signal in the union so such package-only releases remain updateable.
-  // undefined/null is UNKNOWN (older backend, no repo, or a failed probe), for
-  // which the same semver comparison remains the safe fallback.
+  // Source provenance from GET /api/apps/{id}/update-check, keyed by the
+  // installed row's numeric id, is the sole update authority. A version is
+  // mutable descriptive metadata: using it as a fallback would let a local
+  // version bump hide a real update (or manufacture a false one).
   const updateCheck = installedApp ? updateChecks[installedApp.id] : undefined
   // Keep accepting the original bool|null cache shape while rolling out the
   // object contract. The enum is authoritative when present. A legacy
@@ -257,13 +253,13 @@ export function appLifecycleFor(item, {
     : updateCheck && typeof updateCheck === 'object' && updateCheck.needsResolution === true
       ? 'needs_resolution'
       : null
-  const semverUpdate = !!(
+  const hasUpdate = gitUpdate === true
+  const sourceCheckUnavailable = !!(
     installedApp &&
-    installedVersion &&
-    m?.version &&
-    semverCmp(installedVersion, m.version) < 0
+    updateCheck &&
+    typeof updateCheck === 'object' &&
+    gitUpdate === null
   )
-  const hasUpdate = gitUpdate === true || semverUpdate
   const conflict = pendingUpdateState === 'needs_resolution' || (
     !hasPendingUpdateState &&
     updateNotice?.kind === 'conflict' && updateNotice?.itemId === item?.id
@@ -331,14 +327,15 @@ export function appLifecycleFor(item, {
 
   if (installedApp) {
     return {
-      key: 'installed',
-      statusLabel: 'Installed',
+      key: sourceCheckUnavailable ? 'unverified' : 'installed',
+      statusLabel: sourceCheckUnavailable ? 'Source check unavailable' : 'Installed',
       actionLabel: 'Open',
       actionKind: 'open',
       cardVariant: 'installed',
       installedApp,
       installedVersion,
       hasUpdate,
+      sourceCheckUnavailable,
       setupRequired,
       setupNeedsAttention,
     }

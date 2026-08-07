@@ -96,12 +96,12 @@ export async function loadInstalledApps(token, opts = {}) {
 // repo's actual content differ from the recorded upstream?" probe. It is
 // authoritative over the client-side semver compare precisely because it
 // catches a release that shipped new content without bumping mobius.json's
-// version. Returns { available, pendingUpdateState, upstreamVersion } or null:
+// version. Returns source-provenance facts or null:
 //   available true/false — the authoritative content comparison
 //   pendingUpdateState  — none, needs_resolution, replay_pending, or unknown
 //   null                — UNKNOWN: an older backend 404s this route, the app has
-//                         no repo, or the fetch failed. The caller falls back to
-//                         the semver comparison, i.e. exactly today's behavior.
+//                         no repo, or the fetch failed. The caller keeps the app
+//                         usable but must not infer an update from its version.
 // During a rolling deploy, a backend may expose only the compatibility
 // needs_resolution boolean or neither pending-state field; normalize both
 // shapes here so the rest of the app has one truthful enum contract.
@@ -132,6 +132,9 @@ export async function fetchUpdateCheck(appId, token) {
         : null,
       pendingUpdateState,
       upstreamVersion: body?.upstream_version || null,
+      installedSourceRevision: body?.installed_source_revision || null,
+      candidateSourceDigest: body?.candidate_source_digest || null,
+      checkedAt: body?.checked_at || null,
     }
   } catch {
     return null

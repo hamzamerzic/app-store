@@ -13,6 +13,21 @@ function setupMetaText(setup, storeInstalled) {
     : 'Install first; setup appears on first open'
 }
 
+function shortRevision(value, length = 12) {
+  return typeof value === 'string' && value
+    ? value.slice(0, length)
+    : null
+}
+
+function checkedAtText(value) {
+  const parsed = typeof value === 'string' ? new Date(value) : null
+  if (!parsed || Number.isNaN(parsed.getTime())) return null
+  return parsed.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  })
+}
+
 export function DetailView({ item, capabilityReview, onRetryCapabilityReview, installed, installedVersions, updateChecks = {}, onBack, onInstall, onUninstall, onOpenInstalled, onSetup, onRetryInstalled, busy, busyActionKind, updateNotice, onReviewUpdate, onDismissNotice, token, installedUnavailable = false, setupCompletions = {}, systemSetupReady = false }) {
   const m = capabilityReview?.preview?.manifest || item.manifest
   const reviewedItem = m === item.manifest ? item : { ...item, manifest: m }
@@ -66,13 +81,19 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
   )
   const canOpenSetup = showSetup && (setup.scope === 'system' || storeInstalled)
   const accessChanged = capabilityReview?.status === 'changed'
+  const sourceCheck = storeInstalled ? updateChecks[storeInstalled.id] : null
+  const installedRevision = shortRevision(
+    sourceCheck?.installedSourceRevision || storeInstalled?.upstream_commit,
+  )
+  const candidateDigest = shortRevision(sourceCheck?.candidateSourceDigest)
+  const checkedAt = checkedAtText(sourceCheck?.checkedAt)
   const [technicalOpen, setTechnicalOpen] = useState(accessChanged)
   useEffect(() => {
     if (accessChanged) setTechnicalOpen(true)
   }, [accessChanged])
   const releaseSummary = storeInstalled && installedVer && installedVer !== m.version
-    ? `Installed v${installedVer} · latest v${m.version}`
-    : `Release v${m.version}`
+    ? `Installed label v${installedVer} · catalog label v${m.version}`
+    : `Version label v${m.version}`
 
   // Use the same first-paint, browser-cacheable installed icon as the grid.
   const heroItemWithIcon = storeInstalled
@@ -242,6 +263,30 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
                 </a>
               </div>
             )}
+
+            {storeInstalled && (
+              <div className="st-technical-section">
+                <div className="st-section-label">Update source</div>
+                <div className="st-esm-note">
+                  {sourceCheck?.available === null
+                    ? 'Source verification was unavailable on the last check.'
+                    : sourceCheck
+                    ? sourceCheck.available
+                      ? 'A different upstream source was verified.'
+                      : 'Installed source matches the verified upstream source.'
+                    : 'Source verification has not completed yet.'}
+                  {installedRevision && (
+                    <div className="st-esm-dep-list">Installed source revision: {installedRevision}</div>
+                  )}
+                  {candidateDigest && (
+                    <div className="st-esm-dep-list">Checked source digest: {candidateDigest}</div>
+                  )}
+                  {checkedAt && (
+                    <div className="st-esm-dep-list">Last verified: {checkedAt}</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </details>
 
@@ -252,7 +297,7 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
           state flip — only its label:
           - not installed:            [ Install ]            (primary)
           - installed, up to date:    [ Open App ]           (primary)
-          - installed, update ready:  [ Update to vX ]       (primary)
+          - installed, update ready:  [ Review update ]      (primary)
                                       [ Uninstall ]          (secondary)
           - update blocked (conflict):[ Resolve update ]     (primary)
           - app list fetch failed:    [ Retry ]              (primary)
@@ -292,7 +337,7 @@ export function DetailView({ item, capabilityReview, onRetryCapabilityReview, in
             : requiresCapabilityReview && !capabilityReviewReady ? 'Reviewing access…'
             : blockedUpdate ? 'Resolve update'
             : lifecycle.actionKind === 'retry' ? 'Retry'
-            : hasUpdate ? `Update to v${m.version}`
+            : hasUpdate ? 'Review update'
             : storeInstalled ? 'Open App'
             : lifecycle.actionLabel}
         </button>

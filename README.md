@@ -68,13 +68,15 @@ Shipping a new version of an app that's already in the catalog is
 just a repo push — you never touch this repo:
 
 1. Push your changes to the app repo (`mobius-os/app-<id>`).
-2. Bump the `version` in that repo's own `mobius.json`. That version
-   is human-facing: it's what the store shows on the card and in the
-   `Update to vX` button.
+2. Optionally update the `version` in that repo's own `mobius.json`. It is a
+   human-facing release label, not an update authority.
 
-Update detection is git-native: the backend compares each installed repo's
-actual content with upstream, so an update can surface even when the version
-string did not move. The snapshots keep first paint fast and resilient; refresh
+Update detection is source-native: the backend compares each installed repo's
+actual source with its recorded upstream revision, preserving a clean merge
+base when local changes exist. A content change surfaces even when the version
+string does not move, while a local version bump cannot hide or manufacture an
+update. The detail view shows the short source revision and the last successful
+verification time. The snapshots keep first paint fast and resilient; refresh
 them when publishing Store changes, but app installation and updating still
 resolve the live manifest URL at click time.
 

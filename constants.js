@@ -326,13 +326,9 @@ export const CATALOG = [
 export const CATALOG_URL =
   'https://raw.githubusercontent.com/mobius-os/app-store/main/catalog.json'
 
-// The store's OWN version — keep in lockstep with mobius.json on each release.
-// The store is bootstrapped separately from the catalog grid; it self-updates
-// via the banner below: fetch its published manifest and, when that version is
-// newer than what's running, offer a one-tap update (the same install
-// transaction every other app uses) followed by a reload so the freshly-patched
-// code loads.
-export const STORE_VERSION = '1.15.8'
+// Human-facing release label for diagnostics. The Store's self-update banner
+// uses verified source provenance, not this value, to decide availability.
+export const STORE_VERSION = '1.15.9'
 export const STORE_SELF = {
   manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-store/main/mobius.json',
   raw_base: 'https://raw.githubusercontent.com/mobius-os/app-store/main/',

@@ -919,7 +919,8 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
   }]
 
   assert.equal(appLifecycleFor(item).actionKind, 'install')
-  assert.equal(appLifecycleFor(item, { installed }).actionKind, 'update')
+  // A changed version label cannot manufacture an update.
+  assert.equal(appLifecycleFor(item, { installed }).actionKind, 'open')
   assert.equal(appLifecycleFor(item, {
     installed,
     updateNotice: { kind: 'conflict', itemId: 'news' },
@@ -927,6 +928,7 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
   assert.equal(appLifecycleFor(item, {
     installed,
     installedUnavailable: true,
+    updateChecks: { 3: true },
   }).actionKind, 'retry')
   assert.equal(appLifecycleFor({
     ...item,
@@ -960,19 +962,17 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
     systemSetupReady: true,
   }).setupNeedsAttention, false)
 
-  // Git-native update-check (keyed by the installed row's numeric id) is
-  // additive to the package-version signal. A negative source-tree probe must
-  // not hide a versioned release whose changes live in static assets, seeds,
-  // icons, jobs, or manifest metadata.
+  // Git-native update-check (keyed by the installed row's numeric id) is the
+  // sole authority. Version labels cannot hide or manufacture an update.
   const upToDate = { ...item, manifest: { ...item.manifest, version: '1.1.0' } }
-  // false + newer package version => update (e.g. a static-only release).
-  assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: false } }).actionKind, 'update')
-  // false + equal package version => open.
+  // false + newer package label => open.
+  assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: false } }).actionKind, 'open')
+  // false + equal package label => open.
   assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: { 3: false } }).actionKind, 'open')
-  // true => update even though the versions match (content changed, no bump).
+  // true => update even though the labels match (source changed, no bump).
   assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: { 3: true } }).actionKind, 'update')
-  // null / absent => fall back to the semver compare (exactly today's behavior).
-  assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: null } }).actionKind, 'update')
+  // null / absent never falls back to a label comparison.
+  assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: null } }).actionKind, 'open')
   assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: {} }).actionKind, 'open')
 
   // A pending receipt is not synonymous with an unresolved conflict. Only the
@@ -1029,7 +1029,14 @@ test('fetchUpdateCheck normalizes current, legacy, and pre-state backends', asyn
   const { fetchUpdateCheck } = await bundle()
   const oldFetch = globalThis.fetch
   const replies = [
-    { update_available: true, pending_update_state: 'replay_pending', upstream_version: '2.0.0' },
+    {
+      update_available: true,
+      pending_update_state: 'replay_pending',
+      upstream_version: '2.0.0',
+      installed_source_revision: 'a'.repeat(40),
+      candidate_source_digest: 'b'.repeat(64),
+      checked_at: '2026-08-07T12:00:00Z',
+    },
     { update_available: true, pending_update_state: 'unknown', upstream_version: '2.0.0' },
     { update_available: true, needs_resolution: true, upstream_version: '2.0.0' },
     { update_available: false, upstream_version: '1.0.0' },
@@ -1043,21 +1050,33 @@ test('fetchUpdateCheck normalizes current, legacy, and pre-state backends', asyn
       available: true,
       pendingUpdateState: 'replay_pending',
       upstreamVersion: '2.0.0',
+      installedSourceRevision: 'a'.repeat(40),
+      candidateSourceDigest: 'b'.repeat(64),
+      checkedAt: '2026-08-07T12:00:00Z',
     })
     assert.deepEqual(await fetchUpdateCheck(1, 'token'), {
       available: true,
       pendingUpdateState: 'unknown',
       upstreamVersion: '2.0.0',
+      installedSourceRevision: null,
+      candidateSourceDigest: null,
+      checkedAt: null,
     })
     assert.deepEqual(await fetchUpdateCheck(1, 'token'), {
       available: true,
       pendingUpdateState: 'needs_resolution',
       upstreamVersion: '2.0.0',
+      installedSourceRevision: null,
+      candidateSourceDigest: null,
+      checkedAt: null,
     })
     assert.deepEqual(await fetchUpdateCheck(1, 'token'), {
       available: false,
       pendingUpdateState: null,
       upstreamVersion: '1.0.0',
+      installedSourceRevision: null,
+      candidateSourceDigest: null,
+      checkedAt: null,
     })
   } finally {
     globalThis.fetch = oldFetch
@@ -1131,7 +1150,13 @@ test('app details keep stable access information in a bottom disclosure', async 
   assert.ok(capability > disclosure)
   assert.ok(footer > capability)
   assert.match(source, /Privacy, access & technical details/)
+  assert.match(source, /Update source/)
+  assert.match(source, /Installed source revision/)
+  assert.match(source, /Last verified/)
   assert.doesNotMatch(source, /Access and agent integration/)
+  const selfUpdateSource = await readFile(join(root, '..', 'ui', 'SelfUpdateBanner.jsx'), 'utf8')
+  assert.match(selfUpdateSource, /fetchUpdateCheck\(appId, token\)/)
+  assert.doesNotMatch(selfUpdateSource, /semverCmp/)
 })
 
 test('desktop measure applies to every direct scroll child without a class allowlist', async () => {
@@ -1156,7 +1181,10 @@ test('busy labels stay tied to the action that started', async () => {
   }]
   const installedAfter = [{ ...installedBefore[0], version: '1.0.2-mobius.17' }]
 
-  assert.equal(appLifecycleFor(item, { installed: installedBefore }).actionKind, 'update')
+  assert.equal(appLifecycleFor(item, {
+    installed: installedBefore,
+    updateChecks: { 60: true },
+  }).actionKind, 'update')
   assert.equal(appLifecycleFor(item, {
     installed: installedAfter,
     updateChecks: { 60: false },
