@@ -839,15 +839,34 @@ export default function App({ appId, token }) {
     }
   }
 
-  const handleReviewUpdate = async (notice) => {
+  const handleReviewUpdate = async (notice, resolutionPolicy = null) => {
     if (busy || !notice) return
+    if (notice.kind === 'conflict' && !resolutionPolicy) {
+      const item = notice.item || catalog.find(candidate => candidate.id === notice.itemId)
+      if (!item) {
+        setToast({ kind: 'error', message: 'This blocked update is no longer in the catalog.' })
+        return
+      }
+      setUpdateReview({
+        item,
+        installedApp: findInstalled(installed, item),
+        preview: null,
+        capabilityReview: null,
+        blockedNotice: { ...notice, item },
+      })
+      return
+    }
     setBusy(true)
     setBusyItemId(notice.itemId || null)
     setBusyActionKind('resolve')
     setCardErrors(prev => withoutKey(prev, notice.itemId))
     try {
       if (notice.kind === 'conflict') {
-        const resolver = await createConflictResolverChat(notice.appId, token)
+        const resolver = await createConflictResolverChat(
+          notice.appId,
+          resolutionPolicy,
+          token,
+        )
         // Retire only the result that opened this resolver. The global conflict
         // notice remains until a later update probe confirms durable state.
         setUpdateReview(current => clearResolvedBlockedReview(current, notice))
@@ -1297,7 +1316,7 @@ export default function App({ appId, token }) {
             error={cardErrors[updateReview.item.id] || ''}
             onClose={() => setUpdateReview(null)}
             onApply={handleApplyReviewedUpdate}
-            onResolve={() => handleReviewUpdate(updateReview.blockedNotice)}
+            onResolve={(policy) => handleReviewUpdate(updateReview.blockedNotice, policy)}
             onReviewWithAgent={handleAgentUpdateReview}
           />
         )}
@@ -1433,7 +1452,7 @@ export default function App({ appId, token }) {
           error={cardErrors[updateReview.item.id] || ''}
           onClose={() => setUpdateReview(null)}
           onApply={handleApplyReviewedUpdate}
-          onResolve={() => handleReviewUpdate(updateReview.blockedNotice)}
+          onResolve={(policy) => handleReviewUpdate(updateReview.blockedNotice, policy)}
           onReviewWithAgent={handleAgentUpdateReview}
         />
       )}

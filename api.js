@@ -515,10 +515,14 @@ export async function loadUpdateCandidatePreview(appId, manifestUrl, token) {
   return await readJsonOrThrow(res, 'Update changes could not be loaded')
 }
 
-export async function createConflictResolverChat(appId, token) {
+export async function createConflictResolverChat(appId, resolutionPolicy, token) {
   const res = await fetch(`/api/apps/${appId}/conflict-resolver-chat`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ resolution_policy: resolutionPolicy }),
   })
   return await readJsonOrThrow(res, 'Could not open resolver chat')
 }

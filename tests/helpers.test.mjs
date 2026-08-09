@@ -722,6 +722,31 @@ test('candidate review requests the exact catalog manifest selected by the user'
   }
 })
 
+test('resolver chat request binds the selected whole-tree policy', async () => {
+  const { createConflictResolverChat } = await import(
+    pathToFileURL(join(root, '..', 'api.js'))
+  )
+  const oldFetch = globalThis.fetch
+  let request = null
+  globalThis.fetch = async (url, options) => {
+    request = { url: String(url), options }
+    return new Response(JSON.stringify({
+      chat_id: 'resolver-chat', created: true, started: true,
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  try {
+    await createConflictResolverChat(80, 'preserve_local', 'token')
+    assert.equal(request.url, '/api/apps/80/conflict-resolver-chat')
+    assert.equal(request.options.method, 'POST')
+    assert.equal(request.options.headers['Content-Type'], 'application/json')
+    assert.deepEqual(JSON.parse(request.options.body), {
+      resolution_policy: 'preserve_local',
+    })
+  } finally {
+    globalThis.fetch = oldFetch
+  }
+})
+
 test('a conflicting apply remains visible as an explicit unchanged result', async () => {
   const {
     clearResolvedBlockedReview,
@@ -733,10 +758,14 @@ test('a conflicting apply remains visible as an explicit unchanged result', asyn
   const themeSource = await readFile(join(root, '..', 'theme.js'), 'utf8')
 
   assert.ok(indexSource.includes('blockedNotice: outcome.notice'))
-  assert.ok(indexSource.includes('onResolve={() => handleReviewUpdate(updateReview.blockedNotice)}'))
+  assert.ok(indexSource.includes('handleReviewUpdate(updateReview.blockedNotice, policy)'))
+  assert.ok(indexSource.includes("notice.kind === 'conflict' && !resolutionPolicy"))
+  assert.ok(indexSource.includes('setUpdateReview({'))
   assert.ok(modalSource.includes('Update not applied'))
   assert.ok(modalSource.includes('Your app was left unchanged'))
-  assert.ok(modalSource.includes('Resolve in chat'))
+  assert.ok(modalSource.includes("onResolve('preserve_local')"))
+  assert.ok(modalSource.includes("onResolve('accept_reviewed_upstream_exact')"))
+  assert.ok(modalSource.includes('Replace all tracked local source'))
   // A resolver-chat failure must stay visible inside the blocked result while
   // leaving the same Resolve action enabled for a retry.
   assert.match(modalSource, /blockedNotice[\s\S]*\{error \? \([\s\S]*role="alert"/)

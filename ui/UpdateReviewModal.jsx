@@ -126,7 +126,11 @@ export function UpdateReviewModal({
             <>
               <div className="st-update-review-notice is-blocked" role="status">
                 <div className="st-update-review-result-title">Your app was left unchanged</div>
-                <div>Local changes overlap the new version, so Möbius did not replace the app that is currently working. Resolve the overlap in chat when you’re ready.</div>
+                <div>Local changes overlap the new version. Choose the complete-source policy before the resolver opens.</div>
+                <div className="st-update-resolution-options">
+                  <div><strong>Keep my changes</strong><span>Reconcile the overlap, then review every local difference before updating.</span></div>
+                  <div><strong>Use update exactly</strong><span>Replace all tracked local source with the reviewed update.</span></div>
+                </div>
               </div>
               {error ? (
                 <div className="st-error-box st-selectable-error" role="alert">
@@ -172,9 +176,14 @@ export function UpdateReviewModal({
             Not now
           </button>
           {blockedNotice ? (
-            <button ref={resolveRef} type="button" className="st-btn st-btn-primary" onClick={onResolve} disabled={busy}>
-              {resolving ? 'Opening…' : 'Resolve in chat'}
-            </button>
+            <>
+              <button ref={resolveRef} type="button" className="st-btn st-btn-primary" onClick={() => onResolve('preserve_local')} disabled={busy}>
+                {resolving ? 'Opening…' : 'Keep my changes'}
+              </button>
+              <button type="button" className="st-btn st-btn-secondary st-update-exact" onClick={() => onResolve('accept_reviewed_upstream_exact')} disabled={busy}>
+                {resolving ? 'Opening…' : 'Use update exactly'}
+              </button>
+            </>
           ) : (
             <>
               <button
