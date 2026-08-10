@@ -1077,6 +1077,17 @@ export const CSS = `
 .st-update-review-result-title {
   margin-bottom: 7px; color: var(--text); font-size: 16px; font-weight: 700;
 }
+.st-update-resolution-options { display: grid; gap: 9px; margin-top: 14px; }
+.st-update-resolution-options > div {
+  display: grid; gap: 2px; padding-left: 11px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.st-update-resolution-options strong { color: var(--text); font-size: 13px; }
+.st-update-resolution-options span { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.st-update-exact {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
 .st-update-review-error-text,
 .st-selectable-error {
   user-select: text;
