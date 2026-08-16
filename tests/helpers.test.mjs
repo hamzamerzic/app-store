@@ -72,19 +72,54 @@ test('live catalog metadata preserves baked snapshots and appends new entries', 
   ])
 })
 
+test('openInstalledApp has one options contract for intent and fallback', async () => {
+  const { openInstalledApp } = await import(pathToFileURL(join(root, '..', 'api.js')))
+  const oldWindow = globalThis.window
+  try {
+    const messages = []
+    const parent = { postMessage: (...args) => messages.push(args) }
+    globalThis.window = { parent, location: { origin: 'https://mobius.test' } }
+    openInstalledApp(34, { intent: 'setup' })
+    assert.deepEqual(messages, [[
+      { type: 'moebius:open-app', appId: 34, intent: 'setup' },
+      'https://mobius.test',
+    ]])
+
+    let fellBack = false
+    globalThis.window = { location: { origin: 'https://mobius.test' } }
+    globalThis.window.parent = globalThis.window
+    openInstalledApp(34, { onUnembedded: () => { fellBack = true } })
+    assert.equal(fellBack, true)
+  } finally {
+    globalThis.window = oldWindow
+  }
+})
+
 test('published apps outside the catalog stay usable and updatable without false provenance', async () => {
-  const { appLifecycleFor, otherInstalledCatalogItems } = await bundle()
+  const {
+    appLifecycleFor,
+    otherInstalledCatalogItems,
+    sourceBackedInstalledApps,
+  } = await bundle()
   const linked = {
     id: 34,
     name: 'Linked App',
     description: 'Installed from a shared source.',
     version: '1.1.2',
     manifest_url: 'https://example.test/apps/linked#manifest-id=linked-app',
+    source_manifest: {
+      id: 'linked-app',
+      url: 'https://example.test/apps/linked/mobius.json',
+    },
   }
   const curated = {
     id: 8,
     name: 'Notes',
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main#manifest-id=notes',
+    source_manifest: {
+      id: 'notes',
+      url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
+    },
   }
   const catalog = [{
     id: 'notes',
@@ -94,10 +129,11 @@ test('published apps outside the catalog stay usable and updatable without false
 
   assert.deepEqual(otherInstalledCatalogItems([linked, curated], catalog), [{
     id: 'other-installed-34',
-    manifest_identity_id: 'linked-app',
-    source: 'outside-catalog',
+    source_manifest: {
+      id: 'linked-app',
+      url: 'https://example.test/apps/linked/mobius.json',
+    },
     collection: 'other-installed',
-    categories: ['installed'],
     manifest_url: 'https://example.test/apps/linked/mobius.json',
     raw_base: 'https://example.test/apps/linked/',
     name: 'Linked App',
@@ -109,10 +145,10 @@ test('published apps outside the catalog stay usable and updatable without false
     },
     error: null,
   }])
-  assert.deepEqual(otherInstalledCatalogItems([{
-    id: 99,
-    manifest_url: 'https://example.test/app#manifest-id=%broken',
-  }], []), [])
+  assert.deepEqual(otherInstalledCatalogItems([{ id: 99, source_manifest: null }], []), [])
+  assert.deepEqual(sourceBackedInstalledApps([linked, { id: 99 }], {
+    excludeAppIds: ['34'],
+  }), [])
   assert.deepEqual(otherInstalledCatalogItems([linked], [], {
     // App ids arrive from the route as text while installed rows use numbers.
     excludeAppIds: ['34'],
@@ -1053,7 +1089,7 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
   assert.equal(appLifecycleFor(item, {
     installed,
     installedUnavailable: true,
-    updateChecks: { 3: true },
+    updateChecks: { 3: { available: true, pendingUpdateState: 'none' } },
   }).actionKind, 'retry')
   assert.equal(appLifecycleFor({
     ...item,
@@ -1091,11 +1127,17 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
   // sole authority. Version labels cannot hide or manufacture an update.
   const upToDate = { ...item, manifest: { ...item.manifest, version: '1.1.0' } }
   // false + newer package label => open.
-  assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: false } }).actionKind, 'open')
+  assert.equal(appLifecycleFor(item, { installed, updateChecks: {
+    3: { available: false, pendingUpdateState: 'none' },
+  } }).actionKind, 'open')
   // false + equal package label => open.
-  assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: { 3: false } }).actionKind, 'open')
+  assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: {
+    3: { available: false, pendingUpdateState: 'none' },
+  } }).actionKind, 'open')
   // true => update even though the labels match (source changed, no bump).
-  assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: { 3: true } }).actionKind, 'update')
+  assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: {
+    3: { available: true, pendingUpdateState: 'none' },
+  } }).actionKind, 'update')
   // null / absent never falls back to a label comparison.
   assert.equal(appLifecycleFor(item, { installed, updateChecks: { 3: null } }).actionKind, 'open')
   assert.equal(appLifecycleFor(upToDate, { installed, updateChecks: {} }).actionKind, 'open')
@@ -1138,19 +1180,9 @@ test('appLifecycleFor chooses one primary action per catalog state', async () =>
   })
   assert.equal(unknownPending.actionKind, 'update')
   assert.equal(unknownPending.pendingUpdateState, 'unknown')
-
-  // Rolling-deploy compatibility: old object responses may omit the enum.
-  assert.equal(appLifecycleFor(upToDate, {
-    installed,
-    updateChecks: { 3: { available: true } },
-  }).actionKind, 'update')
-  assert.equal(appLifecycleFor(upToDate, {
-    installed,
-    updateChecks: { 3: { available: true, needsResolution: true } },
-  }).actionKind, 'resolve')
 })
 
-test('fetchUpdateCheck normalizes current, legacy, and pre-state backends', async () => {
+test('fetchUpdateCheck maps the current backend contract', async () => {
   const { fetchUpdateCheck } = await bundle()
   const oldFetch = globalThis.fetch
   const replies = [
@@ -1163,8 +1195,7 @@ test('fetchUpdateCheck normalizes current, legacy, and pre-state backends', asyn
       checked_at: '2026-08-07T12:00:00Z',
     },
     { update_available: true, pending_update_state: 'unknown', upstream_version: '2.0.0' },
-    { update_available: true, needs_resolution: true, upstream_version: '2.0.0' },
-    { update_available: false, upstream_version: '1.0.0' },
+    { update_available: false, pending_update_state: 'none', upstream_version: '1.0.0' },
   ]
   globalThis.fetch = async () => new Response(JSON.stringify(replies.shift()), {
     status: 200,
@@ -1188,16 +1219,8 @@ test('fetchUpdateCheck normalizes current, legacy, and pre-state backends', asyn
       checkedAt: null,
     })
     assert.deepEqual(await fetchUpdateCheck(1, 'token'), {
-      available: true,
-      pendingUpdateState: 'needs_resolution',
-      upstreamVersion: '2.0.0',
-      installedSourceRevision: null,
-      candidateSourceDigest: null,
-      checkedAt: null,
-    })
-    assert.deepEqual(await fetchUpdateCheck(1, 'token'), {
       available: false,
-      pendingUpdateState: null,
+      pendingUpdateState: 'none',
       upstreamVersion: '1.0.0',
       installedSourceRevision: null,
       candidateSourceDigest: null,
@@ -1308,11 +1331,11 @@ test('busy labels stay tied to the action that started', async () => {
 
   assert.equal(appLifecycleFor(item, {
     installed: installedBefore,
-    updateChecks: { 60: true },
+    updateChecks: { 60: { available: true, pendingUpdateState: 'none' } },
   }).actionKind, 'update')
   assert.equal(appLifecycleFor(item, {
     installed: installedAfter,
-    updateChecks: { 60: false },
+    updateChecks: { 60: { available: false, pendingUpdateState: 'none' } },
   }).actionKind, 'open')
 
   assert.equal(busyLabelForAction('update'), 'Updating…')
@@ -1336,33 +1359,6 @@ test('scheduleSummary handles cron and on-demand jobs', async () => {
   assert.equal(scheduleSummary({ default: '0 6 * * *' }), 'Runs daily at 06:00 UTC')
   assert.equal(scheduleSummary({ job: 'build.sh' }), 'Runs on demand from inside the app')
   assert.equal(scheduleSummary(null), '')
-})
-
-test('normalizeInstalledVersions keeps only catalog version strings', async () => {
-  const { normalizeInstalledVersions } = await bundle()
-
-  assert.deepEqual(
-    normalizeInstalledVersions('{"news":"1.2.0","gym":4,"":"","atlas":"0.3.0"}'),
-    { news: '1.2.0', atlas: '0.3.0' },
-  )
-  assert.deepEqual(normalizeInstalledVersions(['news']), {})
-  assert.deepEqual(normalizeInstalledVersions('{bad'), {})
-  assert.deepEqual(normalizeInstalledVersions(null), {})
-})
-
-test('semverCmp handles releases and pre-releases', async () => {
-  const { semverCmp } = await bundle()
-
-  assert.equal(semverCmp('1.2.0-rc.1', '1.2.0'), -1)
-  assert.equal(semverCmp('1.2.1', '1.2.0'), 1)
-  assert.equal(semverCmp('1.2.0+build.2', '1.2.0'), 0)
-  // SemVer §11: numeric pre-release identifiers compare numerically, so
-  // rc.2 < rc.10 (a plain lexical compare gets this backwards).
-  assert.equal(semverCmp('1.2.0-rc.2', '1.2.0-rc.10'), -1)
-  assert.equal(semverCmp('1.2.0-rc.10', '1.2.0-rc.2'), 1)
-  // Numeric identifiers rank below alphanumeric; fewer identifiers rank lower.
-  assert.equal(semverCmp('1.0.0-alpha', '1.0.0-alpha.1'), -1)
-  assert.equal(semverCmp('1.0.0-1', '1.0.0-alpha'), -1)
 })
 
 test('STORE_VERSION stays in lockstep with mobius.json', async () => {

@@ -37,7 +37,6 @@ const CATALOG_COLLECTIONS = [
 export function CatalogList({
   items,
   installed,
-  installedVersions,
   updateChecks,
   onPick,
   onRetry,
@@ -74,7 +73,6 @@ export function CatalogList({
       key={item.id}
       item={item}
       installed={installed}
-      installedVersions={installedVersions}
       updateChecks={updateChecks}
       onPick={onPick}
       onRetry={onRetry}

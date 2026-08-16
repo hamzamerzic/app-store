@@ -140,53 +140,44 @@ export function canonicalIdentityKey(url, manifestId) {
   return `${base}#manifest-id=${manifestId}`
 }
 
+export function sourceBackedInstalledApps(
+  installed = [],
+  { excludeAppIds = [] } = {},
+) {
+  const excluded = new Set(excludeAppIds.map(id => String(id)))
+  return (installed || []).filter(app => (
+    app?.source_manifest && !excluded.has(String(app.id))
+  ))
+}
+
 // Turn published installed rows that are not represented by the curated
-// catalog into ordinary catalog items. The backend stores manifest_url as a
-// canonical identity (`<base>#manifest-id=<id>`), and every update route
-// reconstructs `<base>/mobius.json` from it. Mirroring that contract here lets
-// these apps use the Store's existing card, update-check, review, and apply
-// paths instead of growing a second lifecycle.
+// catalog into ordinary catalog items. The platform supplies one explicit
+// source_manifest contract, so the Store can reuse its existing card, update,
+// review, and apply paths without parsing persistence identities or growing a
+// second lifecycle.
 export function otherInstalledCatalogItems(
   installed = [],
   catalog = [],
   { excludeAppIds = [] } = {},
 ) {
   const representedAppIds = new Set()
-  const excludedAppIds = new Set(excludeAppIds.map(id => String(id)))
   for (const item of catalog || []) {
     const app = findInstalled(installed, item)
     if (app) representedAppIds.add(app.id)
   }
 
   const items = []
-  for (const app of installed || []) {
-    if (
-      !app?.manifest_url
-      || representedAppIds.has(app.id)
-      || excludedAppIds.has(String(app.id))
-    ) continue
-    const identity = String(app.manifest_url)
-    const marker = '#manifest-id='
-    const markerIndex = identity.lastIndexOf(marker)
-    if (markerIndex < 1) continue
-    const base = identity.slice(0, markerIndex).replace(/\/+$/, '')
-    let manifestId
-    try {
-      manifestId = decodeURIComponent(identity.slice(markerIndex + marker.length))
-    } catch {
-      // A malformed legacy identity must not prevent the Store from showing
-      // every other installed app. The backend cannot update it either.
-      continue
-    }
-    if (!base || !manifestId) continue
+  for (const app of sourceBackedInstalledApps(installed, { excludeAppIds })) {
+    if (representedAppIds.has(app.id)) continue
+    const manifestId = app.source_manifest.id
+    const manifestUrl = app.source_manifest.url
+    if (!manifestId || !manifestUrl) continue
     items.push({
       id: `other-installed-${app.id}`,
-      manifest_identity_id: manifestId,
-      source: 'outside-catalog',
+      source_manifest: app.source_manifest,
       collection: 'other-installed',
-      categories: ['installed'],
-      manifest_url: `${base}/mobius.json`,
-      raw_base: `${base}/`,
+      manifest_url: manifestUrl,
+      raw_base: manifestUrl.replace(/mobius\.json$/, ''),
       name: app.name || manifestId,
       // The installed row is a durable display fallback when a published
       // source has moved or disappeared. A successful hydration replaces it
@@ -229,7 +220,7 @@ function trustedCatalogRepoBase(urlOrIdentity) {
 // rows are repaired by the backend install path when the user installs the
 // catalog entry.
 export function findInstalled(installed, item) {
-  const manifestId = item.manifest_identity_id || item.manifest?.id || item.id
+  const manifestId = item.source_manifest?.id || item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
   const exact = installed.find(a => a.manifest_url === canonical)
   if (exact) return exact
@@ -252,18 +243,6 @@ export function shouldRefreshCatalogManifest(item, installed = []) {
   return !item?.manifest || Boolean(findInstalled(installed, item))
 }
 
-export function installedVersionFor(item, installedVersions, installedApp) {
-  // The installed App row's persisted version is the authoritative source —
-  // the backend writes App.version on every install + update path. The local
-  // installed-versions.json cache is only a fallback for the brief window
-  // before that row is fetched; a stale cache entry must never mask the
-  // live row's version.
-  return installedApp?.version ||
-    installedApp?.manifest?.version ||
-    installedVersions[item.id] ||
-    ''
-}
-
 export function busyLabelForAction(actionKind) {
   if (actionKind === 'checking_update') return 'Loading changes…'
   if (actionKind === 'update') return 'Updating…'
@@ -284,7 +263,6 @@ export function capabilityDiffNeedsReview(diff) {
 
 export function appLifecycleFor(item, {
   installed = [],
-  installedVersions = {},
   updateChecks = {},
   updateNotice = null,
   installedUnavailable = false,
@@ -293,7 +271,7 @@ export function appLifecycleFor(item, {
 } = {}) {
   const m = item?.manifest || null
   const installedApp = item ? findInstalled(installed, item) : null
-  const installedVersion = installedVersionFor(item, installedVersions, installedApp)
+  const installedVersion = installedApp?.version || ''
   const setupRequired = item?.setup?.required === true
   const setupScope = item?.setup?.scope || 'app'
   const setupNeedsAttention = !!(
@@ -309,34 +287,16 @@ export function appLifecycleFor(item, {
   // mutable descriptive metadata: using it as a fallback would let a local
   // version bump hide a real update (or manufacture a false one).
   const updateCheck = installedApp ? updateChecks[installedApp.id] : undefined
-  // Keep accepting the original bool|null cache shape while rolling out the
-  // object contract. The enum is authoritative when present. A legacy
-  // needsResolution boolean is understood only when no enum was supplied.
-  const gitUpdate = updateCheck && typeof updateCheck === 'object'
-    ? updateCheck.available
-    : updateCheck
-  const hasPendingUpdateState = !!(
-    updateCheck && typeof updateCheck === 'object' && (
-      updateCheck.pendingUpdateState === 'needs_resolution' ||
-      updateCheck.pendingUpdateState === 'replay_pending' ||
-      updateCheck.pendingUpdateState === 'unknown' ||
-      updateCheck.pendingUpdateState === 'none'
-    )
-  )
-  const pendingUpdateState = hasPendingUpdateState
-    ? updateCheck.pendingUpdateState
-    : updateCheck && typeof updateCheck === 'object' && updateCheck.needsResolution === true
-      ? 'needs_resolution'
-      : null
+  const gitUpdate = updateCheck?.available
+  const pendingUpdateState = updateCheck?.pendingUpdateState || null
   const hasUpdate = gitUpdate === true
   const sourceCheckUnavailable = !!(
     installedApp &&
     updateCheck &&
-    typeof updateCheck === 'object' &&
     gitUpdate === null
   )
   const conflict = pendingUpdateState === 'needs_resolution' || (
-    !hasPendingUpdateState &&
+    !pendingUpdateState &&
     updateNotice?.kind === 'conflict' && updateNotice?.itemId === item?.id
   )
   const needsFreshInstalledState =
@@ -495,12 +455,10 @@ const CATALOG_COLLECTIONS = new Set([
   'explore',
   'play',
   'developer',
+  'other-installed',
 ])
 
 export function catalogCollection(item) {
-  if (item?.source === 'outside-catalog' || item?.collection === 'other-installed') {
-    return 'other-installed'
-  }
   const curated = String(item?.collection || '').trim().toLowerCase()
   if (CATALOG_COLLECTIONS.has(curated)) return curated
 
@@ -587,42 +545,6 @@ export function filterCatalog(items, { query = '', category = 'all' } = {}) {
   })
 }
 
-export function semverCmp(a, b) {
-  if (!a || !b) return 0
-  const core = (v) => String(v).split('+')[0].split('-')[0]
-  const pre = (v) => { const m = String(v).split('+')[0].split('-').slice(1).join('-'); return m || '' }
-  const pa = core(a).split('.').map(n => parseInt(n, 10) || 0)
-  const pb = core(b).split('.').map(n => parseInt(n, 10) || 0)
-  const len = Math.max(pa.length, pb.length, 3)
-  for (let i = 0; i < len; i++) {
-    const va = pa[i] || 0
-    const vb = pb[i] || 0
-    if (va < vb) return -1
-    if (va > vb) return 1
-  }
-  // Equal numeric core: a release (no pre-release) outranks a pre-release; two
-  // pre-releases compare by dot-separated identifiers per SemVer §11 — numeric
-  // ones numerically (so rc.2 < rc.10, not the lexical reverse), numeric ranks
-  // below alphanumeric, and a smaller set of identifiers ranks lower when all
-  // the preceding ones are equal.
-  const ra = pre(a), rb = pre(b)
-  if (ra === rb) return 0
-  if (!ra) return 1
-  if (!rb) return -1
-  const ida = ra.split('.'), idb = rb.split('.')
-  for (let i = 0; i < Math.max(ida.length, idb.length); i++) {
-    if (i >= ida.length) return -1
-    if (i >= idb.length) return 1
-    const x = ida[i], y = idb[i]
-    if (x === y) continue
-    const xn = /^\d+$/.test(x), yn = /^\d+$/.test(y)
-    if (xn && yn) return parseInt(x, 10) < parseInt(y, 10) ? -1 : 1
-    if (xn !== yn) return xn ? -1 : 1
-    return x < y ? -1 : 1
-  }
-  return 0
-}
-
 // Heart of the install flow. One call to POST /api/apps/install — the
 // backend does fetch + validate + compile + source_dir + storage seeds
 // + icon + cron in a single transaction with filesystem rollback on
@@ -632,10 +554,6 @@ export function semverCmp(a, b) {
 // here. There's no client-side fallback to the multi-step flow on
 // purpose — that path silently leaked partial installs on failure.
 // Older containers should be updated before the store works.
-export function firstConflictFiles(preview) {
-  return preview.conflict_files || preview.conflicts || []
-}
-
 export function compactExcerpt(text, limit = 150) {
   const compact = String(text || '').replace(/\s+/g, ' ').trim()
   return compact.length > limit ? `${compact.slice(0, limit)}...` : compact
@@ -717,7 +635,7 @@ export function buildConflictResolveMessage({ item, result, preview }) {
   const name = safeInline(result.name || item.manifest?.name || item.id)
   const slug = safeInline(result.slug || item.manifest?.id || item.id, 64)
   const version = safeInline(preview.upstream_version || result.version || item.manifest?.version || 'latest', 32)
-  const files = firstConflictFiles(preview)
+  const files = preview.conflicts || []
   const conflictList = files.length
     ? files.map(file => `- ${safeInline(file.path, 200)}`).join('\n')
     : (result.conflict_paths || []).map(path => `- ${safeInline(path, 200)}`).join('\n') || '- (No conflict paths were returned.)'

@@ -33,7 +33,6 @@
     "catalog.json",
     "theme.js",
     "domain.js",
-    "storage.js",
     "api.js",
     "manifest-snapshots.js",
     "ui/IconBox.jsx",

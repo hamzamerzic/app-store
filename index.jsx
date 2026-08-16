@@ -6,7 +6,6 @@
 //                    and permission explanation tables
 //   theme.js      — the single app stylesheet (CSS)
 //   domain.js     — pure + DOM-level URL, version, schedule, and update-message logic
-//   storage.js    — installed-version storage layer
 //   api.js        — catalog fetch, install/update, app list, and chat API helpers
 //   ui/*.jsx      — one React component per file
 //
@@ -22,7 +21,6 @@ import {
   appLifecycleFor,
   busyLabelForAction,
   capabilityDiffNeedsReview,
-  canonicalIdentityKey,
   clearResolvedBlockedReview,
   clearSettledBlockedReview,
   collectCategories,
@@ -32,7 +30,7 @@ import {
   mergeCatalogEntries,
   otherInstalledCatalogItems,
   manifestCapabilityRows,
-  semverCmp,
+  sourceBackedInstalledApps,
   shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
 } from './domain.js'
@@ -58,7 +56,6 @@ import {
   SETUP_COMPLETIONS_KEY,
   SYSTEM_SETUP_READY_KEY,
 } from './api.js'
-import { loadInstalledVersions, saveInstalledVersions } from './storage.js'
 import { CatalogList } from './ui/CatalogList.jsx'
 import { CatalogFilters } from './ui/CatalogFilters.jsx'
 import { CatalogSkeleton } from './ui/CatalogSkeleton.jsx'
@@ -90,13 +87,12 @@ export {
   humanCron,
   isTrustedHost,
   scheduleSummary,
-  semverCmp,
+  sourceBackedInstalledApps,
   shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
   validateManifestUrl,
 } from './domain.js'
 export { STORE_VERSION } from './constants.js'
-export { normalizeInstalledVersions } from './storage.js'
 export {
   fetchCatalog,
   fetchManifest,
@@ -165,10 +161,9 @@ async function mapWithConcurrency(items, limit, mapper) {
 
 // Probe GET /api/apps/{id}/update-check for the given installed rows and return
 // a { [numericAppId]: source-provenance facts } map.
-// bounded pool as the manifest refetch. fetchUpdateCheck never throws — it
-// degrades to null — so this resolves cleanly even when the endpoint 404s on an
-// older backend; callers merge the answered ids and leave unanswered rows in
-// an unknown state. Every manifest-backed installed row shares this authority.
+// Use the same bounded pool as manifest refetches. fetchUpdateCheck never
+// throws; callers merge answered ids and leave unavailable rows unknown. Every
+// source-backed installed row shares this authority.
 async function fetchUpdateChecksFor(rows, token) {
   if (!rows.length) return {}
   const results = await mapWithConcurrency(rows, MANIFEST_FETCH_CONCURRENCY, async (app) => ({
@@ -204,8 +199,7 @@ function knownPendingUpdateState(check) {
     check.pendingUpdateState === 'needs_resolution' ||
     check.pendingUpdateState === 'replay_pending'
   ) return check.pendingUpdateState
-  // Accept a cached rolling-deploy object created before the enum contract.
-  return check.needsResolution === true ? 'needs_resolution' : null
+  return null
 }
 
 // Merge fresh update-check answers into the prior map, but return the SAME
@@ -243,7 +237,7 @@ function itemIdsSettledByChecks(items, apps, checks) {
   for (const item of items || []) {
     const app = findInstalled(apps || [], item)
     const check = app ? checks?.[app.id] : undefined
-    const available = check && typeof check === 'object' ? check.available : check
+    const available = check?.available
     if (app && available === false) settled.add(item.id)
   }
   return settled
@@ -265,7 +259,6 @@ export default function App({ appId, token }) {
   const catalogRef = useRef(catalog)
   useEffect(() => { catalogRef.current = catalog }, [catalog])
   const [installed, setInstalled] = useState([])
-  const [installedVersions, setInstalledVersions] = useState({})
   // Git-native update state per installed app, keyed by numeric app id. Each
   // answered check carries availability and the pending resolution/replay
   // phase; a missing/null answer is unknown and never becomes a version-based
@@ -343,7 +336,7 @@ export default function App({ appId, token }) {
     setUpdateReview(prev => clearSettledBlockedReview(prev, itemIds))
   }, [])
 
-  // Initial fetch: catalog manifests + installed apps + version map.
+  // Initial fetch: catalog manifests + installed apps.
   // Every await is guarded so a single failing network call can't leave the
   // grid stuck on the skeleton: loadInstalledApps rejects (not just returns
   // []) on a transport-level error, and the per-manifest hydrate already
@@ -359,14 +352,13 @@ export default function App({ appId, token }) {
         // the only work that can delay the initial cards.
         const remoteCatalogPromise = fetchCatalog(CATALOG_URL, token)
           .catch(() => null)
-        const [installedResult, versions, nextProviderStatus] = await Promise.all([
+        const [installedResult, nextProviderStatus] = await Promise.all([
           loadInstalledApps(token)
             .then((apps) => ({ apps, error: '' }))
             .catch((err) => ({
               apps: null,
               error: err?.message || 'Installed apps could not be loaded.',
             })),
-          loadInstalledVersions(appId, token),
           loadProviderStatus(token),
         ])
         if (cancelled) return
@@ -377,7 +369,6 @@ export default function App({ appId, token }) {
         } else {
           setInstalledLoadError(installedResult.error)
         }
-        setInstalledVersions(versions)
         setSetupCompletions(readSetupCompletions())
         setSystemSetupComplete(readSystemSetupReady())
         if (nextProviderStatus) setProviderStatus(nextProviderStatus)
@@ -424,7 +415,7 @@ export default function App({ appId, token }) {
         // ChecksFor never rejects (fetchUpdateCheck degrades to null), so no
         // unhandled rejection escapes; until these land the app remains usable,
         // and when they land they are the sole update authority.
-        const checkRows = apps.filter((app) => app.manifest_url)
+        const checkRows = sourceBackedInstalledApps(apps, { excludeAppIds: [appId] })
         fetchUpdateChecksFor(checkRows, token).then((map) => {
           if (cancelled) return
           setUpdateChecks((prev) => mergeUpdateChecks(prev, map))
@@ -447,15 +438,6 @@ export default function App({ appId, token }) {
     () => otherInstalledCatalogItems(installed, catalog, { excludeAppIds: [appId] }),
     [appId, installed, catalog],
   )
-  const otherInstalledCatalogSourceKey = otherInstalledCatalogSources
-    .map((item) => [
-      item.id,
-      item.manifest_url,
-      item.manifest?.name,
-      item.manifest?.version,
-      item.manifest?.description,
-    ].join('\n'))
-    .join('\n')
   useEffect(() => {
     let cancelled = false
     if (!otherInstalledCatalogSources.length) {
@@ -473,7 +455,7 @@ export default function App({ appId, token }) {
       if (!cancelled) setOtherInstalledCatalog(items)
     })
     return () => { cancelled = true }
-  }, [otherInstalledCatalogSourceKey, token])
+  }, [otherInstalledCatalogSources, token])
 
   // Returns the fresh installed rows, null if a refresh was already in flight,
   // or null on a transport failure. A thrown fetch must NOT escape: this runs
@@ -509,7 +491,7 @@ export default function App({ appId, token }) {
     const apps = installedApps || []
     // Installed rows are the authoritative target list. This also covers apps
     // that arrived through a shared URL and therefore have no curated entry.
-    const checkRows = apps.filter((app) => app.manifest_url)
+    const checkRows = sourceBackedInstalledApps(apps, { excludeAppIds: [appId] })
     if (checkRows.length === 0) {
       lastUpdateCheckRef.current = Date.now()
       return
@@ -525,7 +507,7 @@ export default function App({ appId, token }) {
     } finally {
       updateCheckingRef.current = false
     }
-  }, [token, clearSettledUpdateArtifacts])
+  }, [appId, token, clearSettledUpdateArtifacts])
 
   const handleRetryInstalled = useCallback(async () => {
     const apps = await refreshInstalled()
@@ -608,11 +590,13 @@ export default function App({ appId, token }) {
   // the (defensive) standalone case. The shell handler validates the
   // appId before navigating; we don't need an ack here.
   const handleOpenInstalled = useCallback((id) => {
-    openInstalledApp(id, () => {
-      setToast({
-        kind: 'error',
-        message: 'Open this app from the drawer.',
-      })
+    openInstalledApp(id, {
+      onUnembedded: () => {
+        setToast({
+          kind: 'error',
+          message: 'Open this app from the drawer.',
+        })
+      },
     })
   }, [])
 
@@ -628,11 +612,14 @@ export default function App({ appId, token }) {
       return
     }
     if (installedApp?.id) {
-      openInstalledApp(installedApp.id, { intent: 'setup' }, () => {
-        setToast({
-          kind: 'error',
-          message: 'Open this app from the drawer.',
-        })
+      openInstalledApp(installedApp.id, {
+        intent: 'setup',
+        onUnembedded: () => {
+          setToast({
+            kind: 'error',
+            message: 'Open this app from the drawer.',
+          })
+        },
       })
     }
   }, [])
@@ -729,11 +716,6 @@ export default function App({ appId, token }) {
         return { ok: false, conflict: true, result, notice }
       }
 
-      // Record the version we just installed so update detection
-      // works on the next browse render. The backend returns the
-      // version it actually applied, which is authoritative.
-      const nextVersions = { ...installedVersions, [item.id]: result.version }
-      setInstalledVersions(nextVersions)
       if (result.id) {
         // A successful install/update just made this app current. The
         // git-native probe is authoritative over version strings, so leaving a
@@ -750,7 +732,6 @@ export default function App({ appId, token }) {
       }
       setCardErrors(prev => withoutKey(prev, item.id))
       setUpdateNotice(prev => (prev?.itemId === item.id ? null : prev))
-      await saveInstalledVersions(appId, token, nextVersions)
       await refreshInstalled()
       const openAction = result.id
         ? {
@@ -941,20 +922,6 @@ export default function App({ appId, token }) {
         const text = await r.text()
         throw new Error(`Uninstall failed: ${r.status} ${text}`)
       }
-      // Drop the version record too, matched by the canonical identity key the
-      // backend stamps on every install — NOT slug == manifest.id. A slug can be
-      // suffixed on collision (e.g. "news-2"), so a slug match would miss it and
-      // leave a stale version entry that fakes an "update available" on reinstall.
-      const next = { ...installedVersions }
-      for (const item of catalog) {
-        const manifestId = item.manifest?.id || item.id
-        if (app.manifest_url &&
-            canonicalIdentityKey(item.manifest_url, manifestId) === app.manifest_url) {
-          delete next[item.id]
-        }
-      }
-      setInstalledVersions(next)
-      await saveInstalledVersions(appId, token, next)
       await refreshInstalled()
       window.mobius?.signal?.('app_uninstalled', { slug: app.slug || app.id })
       setToast({ kind: 'success', message: `${app.name} uninstalled.` })
@@ -1240,7 +1207,6 @@ export default function App({ appId, token }) {
     for (const item of displayCatalog) {
       byId.set(item.id, appLifecycleFor(item, {
         installed,
-        installedVersions,
         updateChecks,
         updateNotice: updateNotice?.itemId === item.id ? updateNotice : null,
         installedUnavailable: !!installedLoadError,
@@ -1249,7 +1215,7 @@ export default function App({ appId, token }) {
       }))
     }
     return byId
-  }, [displayCatalog, installed, installedVersions, updateChecks, updateNotice, installedLoadError, setupCompletions, systemSetupReady])
+  }, [displayCatalog, installed, updateChecks, updateNotice, installedLoadError, setupCompletions, systemSetupReady])
 
   const filterCounts = useMemo(() => {
     let updates = 0
@@ -1298,7 +1264,6 @@ export default function App({ appId, token }) {
           capabilityReview={capabilityReviews[detail.id]}
           onRetryCapabilityReview={() => reviewCapabilities(detail)}
           installed={installed}
-          installedVersions={installedVersions}
           onBack={closeDetail}
           onInstall={(item, opts) => opts?.isUpdate
             ? handleCatalogUpdate(item, opts)
@@ -1424,7 +1389,6 @@ export default function App({ appId, token }) {
                   <CatalogList
                     items={visibleCatalog}
                     installed={installed}
-                    installedVersions={installedVersions}
                     updateChecks={updateChecks}
                     onPick={(item) => item.manifest && openDetail(item)}
                     onRetry={retryCatalogItem}
