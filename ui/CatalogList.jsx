@@ -27,6 +27,11 @@ const CATALOG_COLLECTIONS = [
     title: 'Build & run Möbius',
     description: 'Shape how Möbius thinks, works, and evolves.',
   },
+  {
+    id: 'other-installed',
+    title: 'Other installed apps',
+    description: 'Published apps outside the main catalog, with updates checked at their source.',
+  },
 ]
 
 export function CatalogList({

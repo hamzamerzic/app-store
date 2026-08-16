@@ -72,6 +72,80 @@ test('live catalog metadata preserves baked snapshots and appends new entries', 
   ])
 })
 
+test('published apps outside the catalog stay usable and updatable without false provenance', async () => {
+  const { appLifecycleFor, otherInstalledCatalogItems } = await bundle()
+  const linked = {
+    id: 34,
+    name: 'Linked App',
+    description: 'Installed from a shared source.',
+    version: '1.1.2',
+    manifest_url: 'https://example.test/apps/linked#manifest-id=linked-app',
+  }
+  const curated = {
+    id: 8,
+    name: 'Notes',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main#manifest-id=notes',
+  }
+  const catalog = [{
+    id: 'notes',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
+    manifest: { id: 'notes' },
+  }]
+
+  assert.deepEqual(otherInstalledCatalogItems([linked, curated], catalog), [{
+    id: 'other-installed-34',
+    manifest_identity_id: 'linked-app',
+    source: 'outside-catalog',
+    collection: 'other-installed',
+    categories: ['installed'],
+    manifest_url: 'https://example.test/apps/linked/mobius.json',
+    raw_base: 'https://example.test/apps/linked/',
+    name: 'Linked App',
+    manifest: {
+      id: 'linked-app',
+      name: 'Linked App',
+      version: '1.1.2',
+      description: 'Installed from a shared source.',
+    },
+    error: null,
+  }])
+  assert.deepEqual(otherInstalledCatalogItems([{
+    id: 99,
+    manifest_url: 'https://example.test/app#manifest-id=%broken',
+  }], []), [])
+  assert.deepEqual(otherInstalledCatalogItems([linked], [], {
+    // App ids arrive from the route as text while installed rows use numbers.
+    excludeAppIds: ['34'],
+  }), [])
+
+  const hydrated = {
+    ...otherInstalledCatalogItems([linked], [])[0],
+    manifest: { id: 'linked-app', name: 'Linked App', version: '1.1.3' },
+  }
+  const lifecycle = appLifecycleFor(hydrated, {
+    installed: [linked],
+    updateChecks: { 34: { available: true, pendingUpdateState: 'none' } },
+  })
+  assert.equal(lifecycle.key, 'update')
+  assert.equal(lifecycle.actionKind, 'update')
+
+  const unavailable = appLifecycleFor(otherInstalledCatalogItems([linked], [])[0], {
+    installed: [linked],
+    updateChecks: { 34: { available: null, pendingUpdateState: 'none' } },
+  })
+  assert.equal(unavailable.key, 'unverified')
+  assert.equal(unavailable.actionKind, 'open')
+
+  const renamedManifest = {
+    ...hydrated,
+    manifest: { ...hydrated.manifest, id: 'linked-app-next' },
+  }
+  assert.equal(appLifecycleFor(renamedManifest, {
+    installed: [linked],
+    updateChecks: { 34: { available: true, pendingUpdateState: 'none' } },
+  }).key, 'update')
+})
+
 test('findInstalled matches canonical manifest identity, not slug', async () => {
   const { findInstalled } = await bundle()
   const installed = [

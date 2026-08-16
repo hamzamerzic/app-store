@@ -140,6 +140,69 @@ export function canonicalIdentityKey(url, manifestId) {
   return `${base}#manifest-id=${manifestId}`
 }
 
+// Turn published installed rows that are not represented by the curated
+// catalog into ordinary catalog items. The backend stores manifest_url as a
+// canonical identity (`<base>#manifest-id=<id>`), and every update route
+// reconstructs `<base>/mobius.json` from it. Mirroring that contract here lets
+// these apps use the Store's existing card, update-check, review, and apply
+// paths instead of growing a second lifecycle.
+export function otherInstalledCatalogItems(
+  installed = [],
+  catalog = [],
+  { excludeAppIds = [] } = {},
+) {
+  const representedAppIds = new Set()
+  const excludedAppIds = new Set(excludeAppIds.map(id => String(id)))
+  for (const item of catalog || []) {
+    const app = findInstalled(installed, item)
+    if (app) representedAppIds.add(app.id)
+  }
+
+  const items = []
+  for (const app of installed || []) {
+    if (
+      !app?.manifest_url
+      || representedAppIds.has(app.id)
+      || excludedAppIds.has(String(app.id))
+    ) continue
+    const identity = String(app.manifest_url)
+    const marker = '#manifest-id='
+    const markerIndex = identity.lastIndexOf(marker)
+    if (markerIndex < 1) continue
+    const base = identity.slice(0, markerIndex).replace(/\/+$/, '')
+    let manifestId
+    try {
+      manifestId = decodeURIComponent(identity.slice(markerIndex + marker.length))
+    } catch {
+      // A malformed legacy identity must not prevent the Store from showing
+      // every other installed app. The backend cannot update it either.
+      continue
+    }
+    if (!base || !manifestId) continue
+    items.push({
+      id: `other-installed-${app.id}`,
+      manifest_identity_id: manifestId,
+      source: 'outside-catalog',
+      collection: 'other-installed',
+      categories: ['installed'],
+      manifest_url: `${base}/mobius.json`,
+      raw_base: `${base}/`,
+      name: app.name || manifestId,
+      // The installed row is a durable display fallback when a published
+      // source has moved or disappeared. A successful hydration replaces it
+      // with the complete current manifest before any update is offered.
+      manifest: {
+        id: manifestId,
+        name: app.name || manifestId,
+        version: app.version || '',
+        description: app.description || 'Installed app.',
+      },
+      error: null,
+    })
+  }
+  return items
+}
+
 // Trusted catalog apps are one app per mobius-os repository. The platform may
 // deliberately pin an installed row to a reviewed commit while the catalog
 // continues to advertise `main`; the revision is update provenance, not app
@@ -166,7 +229,7 @@ function trustedCatalogRepoBase(urlOrIdentity) {
 // rows are repaired by the backend install path when the user installs the
 // catalog entry.
 export function findInstalled(installed, item) {
-  const manifestId = item.manifest?.id || item.id
+  const manifestId = item.manifest_identity_id || item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
   const exact = installed.find(a => a.manifest_url === canonical)
   if (exact) return exact
@@ -435,6 +498,9 @@ const CATALOG_COLLECTIONS = new Set([
 ])
 
 export function catalogCollection(item) {
+  if (item?.source === 'outside-catalog' || item?.collection === 'other-installed') {
+    return 'other-installed'
+  }
   const curated = String(item?.collection || '').trim().toLowerCase()
   if (CATALOG_COLLECTIONS.has(curated)) return curated
 

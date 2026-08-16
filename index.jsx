@@ -30,6 +30,7 @@ import {
   findInstalled,
   isSystemCatalogItem,
   mergeCatalogEntries,
+  otherInstalledCatalogItems,
   manifestCapabilityRows,
   semverCmp,
   shouldRefreshCatalogManifest,
@@ -84,6 +85,7 @@ export {
   focusBlockedUpdateResult,
   isSystemCatalogItem,
   mergeCatalogEntries,
+  otherInstalledCatalogItems,
   manifestCapabilityRows,
   humanCron,
   isTrustedHost,
@@ -165,9 +167,8 @@ async function mapWithConcurrency(items, limit, mapper) {
 // a { [numericAppId]: source-provenance facts } map.
 // bounded pool as the manifest refetch. fetchUpdateCheck never throws — it
 // degrades to null — so this resolves cleanly even when the endpoint 404s on an
-// older backend; callers merge the answered ids and leave the rest on the
-// semver path. Scoped by the caller to installed catalog apps: only those show
-// a badge, so only their ids are worth checking.
+// older backend; callers merge the answered ids and leave unanswered rows in
+// an unknown state. Every manifest-backed installed row shares this authority.
 async function fetchUpdateChecksFor(rows, token) {
   if (!rows.length) return {}
   const results = await mapWithConcurrency(rows, MANIFEST_FETCH_CONCURRENCY, async (app) => ({
@@ -255,16 +256,12 @@ export default function App({ appId, token }) {
   const [catalog, setCatalog] = useState(() =>
     CATALOG.map(c => ({ ...c, manifest: c.manifest || null, error: null }))
   )
-  // Mirror of `catalog` so the focus/visibility refresh can read the HYDRATED
-  // entries (each carrying its real fetched manifest.id) without taking a
-  // `catalog` dependency — that dependency would churn the event listeners on
-  // every manifest update. The update-check identity must key on the published
-  // manifest id, NOT the raw CATALOG id: an entry whose CATALOG id differs from
-  // its manifest id (e.g. CATALOG `gym` / manifest `workout`) canonicalises to
-  // `#manifest-id=gym` off the raw id but the installed row is stored under
-  // `#manifest-id=workout`, so keying off the raw id never matches and that app
-  // is silently never update-checked. The hydrated manifest.id is the only
-  // value that matches the stored row for ANY id/slug-stem mismatch.
+  const [otherInstalledCatalog, setOtherInstalledCatalog] = useState([])
+  const otherInstalledCatalogRef = useRef(otherInstalledCatalog)
+  useEffect(() => { otherInstalledCatalogRef.current = otherInstalledCatalog }, [otherInstalledCatalog])
+  // Mirror of the hydrated curated catalog for foreground cleanup. Keeping it
+  // out of the refresh callback's dependencies avoids rebinding browser event
+  // listeners after every manifest refresh.
   const catalogRef = useRef(catalog)
   useEffect(() => { catalogRef.current = catalog }, [catalog])
   const [installed, setInstalled] = useState([])
@@ -419,20 +416,15 @@ export default function App({ appId, token }) {
           },
         )
         if (cancelled) return
-        const installedTargets = apps.length
-          ? hydrated.filter((c) => findInstalled(apps, c))
-          : []
         setCatalog(hydrated)
         lastUpdateCheckRef.current = Date.now()
-        // Git-native update-checks for the installed catalog apps. Fire-and-
+        // Git-native update-checks for every manifest-backed app. Fire-and-
         // forget on purpose: a slow or absent (404) endpoint must never gate the
         // skeleton clear in `finally`, so we do NOT await it here. fetchUpdate
         // ChecksFor never rejects (fetchUpdateCheck degrades to null), so no
         // unhandled rejection escapes; until these land the app remains usable,
         // and when they land they are the sole update authority.
-        const checkRows = installedTargets
-          .map((c) => findInstalled(apps, c))
-          .filter(Boolean)
+        const checkRows = apps.filter((app) => app.manifest_url)
         fetchUpdateChecksFor(checkRows, token).then((map) => {
           if (cancelled) return
           setUpdateChecks((prev) => mergeUpdateChecks(prev, map))
@@ -446,6 +438,42 @@ export default function App({ appId, token }) {
     load()
     return () => { cancelled = true }
   }, [appId, token, clearSettledUpdateArtifacts])
+
+  // Published apps may exist outside the curated registry. Hydrate them from
+  // the same canonical source the backend updates, while excluding this Store's
+  // own row. A cancelled effect cannot replace a newer installed-state result
+  // after focus refresh.
+  const otherInstalledCatalogSources = useMemo(
+    () => otherInstalledCatalogItems(installed, catalog, { excludeAppIds: [appId] }),
+    [appId, installed, catalog],
+  )
+  const otherInstalledCatalogSourceKey = otherInstalledCatalogSources
+    .map((item) => [
+      item.id,
+      item.manifest_url,
+      item.manifest?.name,
+      item.manifest?.version,
+      item.manifest?.description,
+    ].join('\n'))
+    .join('\n')
+  useEffect(() => {
+    let cancelled = false
+    if (!otherInstalledCatalogSources.length) {
+      setOtherInstalledCatalog([])
+      return () => { cancelled = true }
+    }
+    mapWithConcurrency(otherInstalledCatalogSources, MANIFEST_FETCH_CONCURRENCY, async (item) => {
+      try {
+        const manifest = await fetchManifest(item.manifest_url, token)
+        return { ...item, manifest, error: null }
+      } catch (error) {
+        return { ...item, error: error.message || String(error) }
+      }
+    }).then((items) => {
+      if (!cancelled) setOtherInstalledCatalog(items)
+    })
+    return () => { cancelled = true }
+  }, [otherInstalledCatalogSourceKey, token])
 
   // Returns the fresh installed rows, null if a refresh was already in flight,
   // or null on a transport failure. A thrown fetch must NOT escape: this runs
@@ -479,27 +507,20 @@ export default function App({ appId, token }) {
     if (updateCheckingRef.current) return
     if (Date.now() - lastUpdateCheckRef.current < REHYDRATE_DEBOUNCE_MS) return
     const apps = installedApps || []
-    // Targets come from the HYDRATED catalog (read via catalogRef so this
-    // callback keeps a stable [token] dep), NOT the raw CATALOG: findInstalled
-    // canonicalises on `item.manifest?.id || item.id`, and only the hydrated
-    // entry carries the real fetched manifest.id. Off the raw CATALOG, an entry
-    // whose id differs from its manifest id (e.g. `gym` → manifest `workout`)
-    // would canonicalise to a `#manifest-id` the installed row was never stored
-    // under, so it would never match and never be update-checked. Entries not
-    // yet hydrated (manifest null) fall back to their raw id; that only means
-    // they wait for the next refresh after mount hydration lands, never a silent
-    // permanent miss.
-    const targets = catalogRef.current.filter(c => findInstalled(apps, c))
-    if (targets.length === 0) {
+    // Installed rows are the authoritative target list. This also covers apps
+    // that arrived through a shared URL and therefore have no curated entry.
+    const checkRows = apps.filter((app) => app.manifest_url)
+    if (checkRows.length === 0) {
       lastUpdateCheckRef.current = Date.now()
       return
     }
     updateCheckingRef.current = true
     try {
-      const checkRows = targets.map(c => findInstalled(apps, c)).filter(Boolean)
       const checks = await fetchUpdateChecksFor(checkRows, token)
       setUpdateChecks(prev => mergeUpdateChecks(prev, checks))
-      clearSettledUpdateArtifacts(itemIdsSettledByChecks(targets, apps, checks))
+      clearSettledUpdateArtifacts(itemIdsSettledByChecks(
+        [...catalogRef.current, ...otherInstalledCatalogRef.current], apps, checks,
+      ))
       lastUpdateCheckRef.current = Date.now()
     } finally {
       updateCheckingRef.current = false
@@ -1206,7 +1227,10 @@ export default function App({ appId, token }) {
     document.getElementById(next === 'browse' ? 'st-tab-browse' : 'st-tab-url')?.focus()
   }
 
-  const displayCatalog = useMemo(() => sortCatalogForDisplay(catalog), [catalog])
+  const displayCatalog = useMemo(
+    () => sortCatalogForDisplay([...catalog, ...otherInstalledCatalog]),
+    [catalog, otherInstalledCatalog],
+  )
   const systemSetupReady = useMemo(
     () => systemSetupComplete || hasConnectedProvider(providerStatus),
     [systemSetupComplete, providerStatus],
@@ -1379,7 +1403,7 @@ export default function App({ appId, token }) {
                     query={query}
                     category={category}
                     filterCounts={filterCounts}
-                    totalCount={catalog.length}
+                    totalCount={displayCatalog.length}
                     resultCount={visibleCatalog.length}
                     onQueryChange={setQuery}
                     onCategoryChange={setCategory}
