@@ -241,15 +241,15 @@ export async function fetchManifest(url, token, opts = {}) {
 }
 
 // Fetch the web registry (catalog.json) via the proxy and return a validated
-// list of catalog entries, or throw. Accepts either a bare array or a
-// `{ apps: [...] }` envelope. Each entry must carry a string id and https
+// list of catalog entries, or throw. Schema 1 is the only supported contract;
+// each entry must carry a string id and https
 // manifest_url + raw_base; malformed entries are dropped rather than trusted.
 // Top-level `name`/`description`/`summary` (sanitized) pass through as
 // discovery copy. `collection` gives curated catalogs a stable browse shelf;
 // callers derive a shelf from categories when it is absent.
-// A valid embedded `manifest` is preserved as a fast first-paint snapshot. Older
-// registries without it still work: callers fall back to fetching manifest_url.
-// The caller falls back to the baked CATALOG when this throws or yields nothing.
+// Release manifests never belong in the live registry. The caller merges these
+// discovery fields over the checked-in CATALOG, preserving its generated
+// snapshot for known apps and fetching only genuinely new entries.
 export async function fetchCatalog(url, token, opts = {}) {
   const retries = opts.retries ?? 2
   const delayMs = opts.retryDelayMs ?? 350
@@ -274,8 +274,10 @@ export async function fetchCatalog(url, token, opts = {}) {
   if (!r) throw lastError || new Error('Catalog fetch failed')
   if (!r.ok) throw new Error(`Catalog fetch failed: ${r.status}`)
   const body = await r.json()
-  const raw = Array.isArray(body) ? body : Array.isArray(body?.apps) ? body.apps : null
-  if (!raw) throw new Error('Catalog is not a list')
+  if (body?.schema !== 1 || !Array.isArray(body.apps)) {
+    throw new Error('Catalog schema is unsupported')
+  }
+  const raw = body.apps
   const httpsStr = (v) => typeof v === 'string' && /^https:\/\//.test(v)
   const sameHost = (a, b) => { try { return new URL(a).host === new URL(b).host } catch { return false } }
   const cleanList = (list, limit = 8) => {
@@ -316,13 +318,6 @@ export async function fetchCatalog(url, token, opts = {}) {
       fields,
     }
   }
-  const normalizeManifest = (manifest) => {
-    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return null
-    for (const key of ['id', 'name', 'version', 'description', 'entry']) {
-      if (typeof manifest[key] !== 'string' || !manifest[key]) return null
-    }
-    return { ...manifest }
-  }
   const seen = new Set()
   const entries = []
   for (const e of raw) {
@@ -359,7 +354,6 @@ export async function fetchCatalog(url, token, opts = {}) {
       keywords: cleanList(e.keywords, 16),
       capabilities: cleanList(e.capabilities, 12),
       setup: normalizeSetup(e.setup),
-      manifest: normalizeManifest(e.manifest),
     })
   }
   return entries
