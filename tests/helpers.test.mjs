@@ -56,6 +56,22 @@ test('canonicalIdentityKey matches backend-style manifest identities', async () 
   )
 })
 
+test('live catalog metadata preserves baked snapshots and appends new entries', async () => {
+  const { mergeCatalogEntries } = await bundle()
+  const bakedManifest = { id: 'notes', version: '1.2.3' }
+  const merged = mergeCatalogEntries([
+    { id: 'notes', summary: 'Old copy', manifest: bakedManifest },
+  ], [
+    { id: 'notes', summary: 'Fresh copy' },
+    { id: 'new-app', summary: 'New app' },
+  ])
+
+  assert.deepEqual(merged, [
+    { id: 'notes', summary: 'Fresh copy', manifest: bakedManifest },
+    { id: 'new-app', summary: 'New app' },
+  ])
+})
+
 test('findInstalled matches canonical manifest identity, not slug', async () => {
   const { findInstalled } = await bundle()
   const installed = [
@@ -330,6 +346,7 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
       return new Response('temporarily unavailable', { status: 503 })
     }
     return new Response(JSON.stringify({
+    schema: 1,
     apps: [
       {
         id: 'notes',
@@ -349,19 +366,11 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
           description: 'Configure notes.',
           fields: ['theme'],
         },
-        manifest: {
-          id: 'notes',
-          name: 'Notes',
-          version: '1.2.3',
-          description: 'Capture notes.',
-          entry: 'index.jsx',
-        },
       },
       {
         id: 'bad-snapshot',
         manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-bad/main/mobius.json',
         raw_base: 'https://raw.githubusercontent.com/mobius-os/app-bad/main/',
-        manifest: { id: 'bad-snapshot', name: 'Bad' },
       },
     ],
     }), {
@@ -392,17 +401,30 @@ test('fetchCatalog retries transient failures and preserves app metadata', async
       action: 'Open app',
       fields: ['theme'],
     })
-    assert.deepEqual(entries[0].manifest, {
-      id: 'notes',
-      name: 'Notes',
-      version: '1.2.3',
-      description: 'Capture notes.',
-      entry: 'index.jsx',
-    })
-    assert.equal(entries[1].manifest, null)
+    assert.equal(Object.hasOwn(entries[0], 'manifest'), false)
+    assert.equal(Object.hasOwn(entries[1], 'manifest'), false)
     assert.equal(Object.hasOwn(entries[1], 'audience'), false)
     assert.equal(Object.hasOwn(entries[1], 'collection'), false)
     assert.equal(Object.hasOwn(entries[1], 'summary'), false)
+  } finally {
+    globalThis.fetch = oldFetch
+  }
+})
+
+test('fetchCatalog rejects pre-schema and unknown registry shapes', async () => {
+  const oldFetch = globalThis.fetch
+  try {
+    const { fetchCatalog } = await bundle()
+    for (const body of [[], { apps: [] }, { schema: 2, apps: [] }]) {
+      globalThis.fetch = async () => new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+      await assert.rejects(
+        () => fetchCatalog('https://example.test/catalog.json', 'tok', { retries: 0 }),
+        /Catalog schema is unsupported/,
+      )
+    }
   } finally {
     globalThis.fetch = oldFetch
   }
@@ -1310,7 +1332,11 @@ test('catalog is a release-independent discovery index with a baked snapshot flo
     assert.equal(new URL(entry.manifest_url).host, new URL(entry.raw_base).host,
       `${entry.id}: raw_base must share manifest_url's host`)
   }
+  assert.match(constants, /import CATALOG_REGISTRY from '.\/catalog\.json'/)
+  assert.match(constants, /CATALOG_REGISTRY\.apps\.map/)
   assert.match(constants, /manifest: MANIFEST_SNAPSHOTS\[entry\.id\] \|\| null/)
+  assert.doesNotMatch(constants, /id:\s*'voice'/,
+    'catalog entries must not be copied into constants.js')
   assert.match(snapshots, /export const MANIFEST_SNAPSHOTS = \{/)
   assert.doesNotMatch(refresh, /entry\.manifest\s*=/)
   assert.doesNotMatch(refresh, /writeFile\(catalogPath/)

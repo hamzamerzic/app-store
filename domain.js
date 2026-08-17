@@ -29,6 +29,18 @@ export function clearResolvedBlockedReview(review, notice) {
   return resolvedItemId && reviewItemId === resolvedItemId ? null : review
 }
 
+// Merge live discovery metadata over the checked-in offline floor. Known apps
+// retain their generated manifest snapshots because the schema-1 registry does
+// not carry release data; genuinely new apps are appended in registry order.
+export function mergeCatalogEntries(baked = [], remote = []) {
+  if (!Array.isArray(remote) || remote.length === 0) return baked
+  const merged = new Map((baked || []).map((entry) => [entry.id, entry]))
+  for (const entry of remote) {
+    merged.set(entry.id, { ...(merged.get(entry.id) || {}), ...entry })
+  }
+  return [...merged.values()]
+}
+
 export function manifestCapabilityRows(manifest = {}) {
   const permissions = manifest.permissions || {}
   const chatLogAccess = permissions.chat_log_access || 'none'

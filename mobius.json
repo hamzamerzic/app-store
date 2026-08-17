@@ -30,6 +30,7 @@
   },
   "source_files": [
     "constants.js",
+    "catalog.json",
     "theme.js",
     "domain.js",
     "storage.js",

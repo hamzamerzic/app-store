@@ -29,6 +29,7 @@ import {
   filterCatalog,
   findInstalled,
   isSystemCatalogItem,
+  mergeCatalogEntries,
   manifestCapabilityRows,
   semverCmp,
   shouldRefreshCatalogManifest,
@@ -82,6 +83,7 @@ export {
   findInstalled,
   focusBlockedUpdateResult,
   isSystemCatalogItem,
+  mergeCatalogEntries,
   manifestCapabilityRows,
   humanCron,
   isTrustedHost,
@@ -394,13 +396,8 @@ export default function App({ appId, token }) {
         // appear without a store-app redeploy — appending it to catalog.json on
         // main is enough. On fetch failure /
         // empty result, the baked CATALOG carries the store untouched.
-        let entries = CATALOG
         const remote = await remoteCatalogPromise
-        if (Array.isArray(remote) && remote.length) {
-          const merged = new Map(CATALOG.map((c) => [c.id, c]))
-          for (const r of remote) merged.set(r.id, { ...(merged.get(r.id) || {}), ...r })
-          entries = [...merged.values()]
-        }
+        const entries = mergeCatalogEntries(CATALOG, remote)
         if (cancelled) return
         // A baked manifest gives every discovery card a fast first paint, but
         // it must not freeze an installed app at the last Store release. Fetch
