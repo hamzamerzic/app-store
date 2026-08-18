@@ -3,19 +3,13 @@ import { validateManifestUrl } from './domain.js'
 export const SETUP_COMPLETIONS_KEY = 'mobius:setup-complete:v1'
 export const SYSTEM_SETUP_READY_KEY = 'mobius:system-setup-ready:v1'
 
-export function openInstalledApp(id, optsOrOnUnembedded, maybeOnUnembedded) {
-  const opts = optsOrOnUnembedded && typeof optsOrOnUnembedded === 'object'
-    ? optsOrOnUnembedded
-    : {}
-  const onUnembedded = typeof optsOrOnUnembedded === 'function'
-    ? optsOrOnUnembedded
-    : maybeOnUnembedded
+export function openInstalledApp(id, { intent, onUnembedded } = {}) {
   if (window.parent === window) {
     if (onUnembedded) onUnembedded()
     return
   }
   const msg = { type: 'moebius:open-app', appId: id }
-  if (typeof opts.intent === 'string' && opts.intent) msg.intent = opts.intent
+  if (typeof intent === 'string' && intent) msg.intent = intent
   window.parent.postMessage(
     msg,
     window.location.origin,
@@ -99,12 +93,8 @@ export async function loadInstalledApps(token, opts = {}) {
 // version. Returns source-provenance facts or null:
 //   available true/false — the authoritative content comparison
 //   pendingUpdateState  — none, needs_resolution, replay_pending, or unknown
-//   null                — UNKNOWN: an older backend 404s this route, the app has
-//                         no repo, or the fetch failed. The caller keeps the app
-//                         usable but must not infer an update from its version.
-// During a rolling deploy, a backend may expose only the compatibility
-// needs_resolution boolean or neither pending-state field; normalize both
-// shapes here so the rest of the app has one truthful enum contract.
+//   null                — UNKNOWN: the app has no repo or the fetch failed. The
+//                         caller keeps it usable and never guesses from version.
 // NEVER throws and NEVER retries: it runs from focus/visibility listeners whose
 // callers have no rejection handler, so a read-only availability probe must
 // degrade to null rather than let a rejection escape and strand the grid.
@@ -115,22 +105,11 @@ export async function fetchUpdateCheck(appId, token) {
     })
     if (!r.ok) return null
     const body = await r.json()
-    const hasPendingUpdateState = (
-      body?.pending_update_state === 'needs_resolution' ||
-      body?.pending_update_state === 'replay_pending' ||
-      body?.pending_update_state === 'unknown' ||
-      body?.pending_update_state === 'none'
-    )
-    const pendingUpdateState = hasPendingUpdateState
-      ? body.pending_update_state
-      : typeof body?.needs_resolution === 'boolean'
-        ? body.needs_resolution ? 'needs_resolution' : 'none'
-        : null
     return {
       available: typeof body?.update_available === 'boolean'
         ? body.update_available
         : null,
-      pendingUpdateState,
+      pendingUpdateState: body.pending_update_state,
       upstreamVersion: body?.upstream_version || null,
       installedSourceRevision: body?.installed_source_revision || null,
       candidateSourceDigest: body?.candidate_source_digest || null,
@@ -359,10 +338,6 @@ export async function fetchCatalog(url, token, opts = {}) {
   return entries
 }
 
-// Compare two semver strings. Returns -1 / 0 / 1. Bad input → 0.
-// Compares the full numeric core (not just 3 segments, so a 4th segment isn't
-// dropped) and honors SemVer pre-release precedence: 1.2.0-rc.1 < 1.2.0, so a
-// pre-release never reads as "up to date" against its own release.
 function installRequestBody({ manifest_url, manifest, raw_base, reviewed_capability_digest, reviewed_source_digest }) {
   const body = {}
   if (manifest_url) {

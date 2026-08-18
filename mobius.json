@@ -1,7 +1,7 @@
 {
   "id": "store",
   "name": "App Store",
-  "version": "1.15.11",
+  "version": "1.15.12",
   "description": "Discover, install, and update M\u00f6bius apps.",
   "author": "mobius-os",
   "license": "MIT",
@@ -33,7 +33,6 @@
     "catalog.json",
     "theme.js",
     "domain.js",
-    "storage.js",
     "api.js",
     "manifest-snapshots.js",
     "ui/IconBox.jsx",

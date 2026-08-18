@@ -27,12 +27,16 @@ const CATALOG_COLLECTIONS = [
     title: 'Build & run Möbius',
     description: 'Shape how Möbius thinks, works, and evolves.',
   },
+  {
+    id: 'other-installed',
+    title: 'Other installed apps',
+    description: 'Published apps outside the main catalog, with updates checked at their source.',
+  },
 ]
 
 export function CatalogList({
   items,
   installed,
-  installedVersions,
   updateChecks,
   onPick,
   onRetry,
@@ -69,7 +73,6 @@ export function CatalogList({
       key={item.id}
       item={item}
       installed={installed}
-      installedVersions={installedVersions}
       updateChecks={updateChecks}
       onPick={onPick}
       onRetry={onRetry}

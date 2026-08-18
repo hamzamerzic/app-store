@@ -1,4 +1,5 @@
 import { appLifecycleFor, busyLabelForAction, catalogCardDescription } from '../domain.js'
+import { Check } from '@openai/apps-sdk-ui/components/Icon'
 import { IconBox, installedIconUrl } from './IconBox.jsx'
 
 function cardVariantClass(variant) {
@@ -17,7 +18,7 @@ function cardVariantClass(variant) {
 // interactive lift (hover/focus) lives in CSS pseudo-classes via
 // .st-card:has(.st-card-open:hover/:focus-visible), not JS state, so the
 // grid no longer rerenders a tile on every pointer move.
-export function CatalogCard({ item, installed, installedVersions, updateChecks = {}, onPick, onRetry, onUpdate, onOpenInstalled, onRetryInstalled, busy, busyActionKind, blocked, error, updateNotice, onReviewUpdate, onDismissNotice, onAskAgentError, askingAgentAboutError = false, token, installedUnavailable = false, setupCompletions = {}, systemSetupReady = false }) {
+export function CatalogCard({ item, installed, updateChecks = {}, onPick, onRetry, onUpdate, onOpenInstalled, onRetryInstalled, busy, busyActionKind, blocked, error, updateNotice, onReviewUpdate, onDismissNotice, onAskAgentError, askingAgentAboutError = false, token, installedUnavailable = false, setupCompletions = {}, systemSetupReady = false }) {
   const m = item.manifest
 
   if (!m) {
@@ -61,7 +62,6 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
 
   const lifecycle = appLifecycleFor(item, {
     installed,
-    installedVersions,
     updateChecks,
     updateNotice,
     installedUnavailable,
@@ -139,7 +139,7 @@ export function CatalogCard({ item, installed, installedVersions, updateChecks =
         {(cardVariant === 'installed' || cardVariant === 'update') && (
           <div className="st-installed-dot" aria-hidden="true">
             <div className={`st-installed-dot-inner${cardVariant === 'update' ? ' is-update' : ''}`}>
-              ✓
+              <Check width={10} height={10} aria-hidden="true" />
             </div>
           </div>
         )}
