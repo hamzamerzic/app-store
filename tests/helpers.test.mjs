@@ -227,6 +227,74 @@ test('findInstalled treats trusted catalog commit pins as the same installed app
   }], catalogItem), null)
 })
 
+test('findInstalled matches a trusted mobius-os app across any manifest-id skew', async () => {
+  const { findInstalled } = await bundle()
+  const installedRow = {
+    id: 102,
+    slug: 'subagents',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main#manifest-id=subagents',
+    version: '0.4.1',
+  }
+
+  // A stale baked snapshot still advertises the pre-rename id `codex` because
+  // the live manifest refresh has not landed. The installed row already carries
+  // the renamed id `subagents`. Repo identity matches regardless of the skew, so
+  // the app is not mislabeled "Not installed" and is not duplicated.
+  const staleSnapshotItem = {
+    id: 'subagents',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json',
+    manifest: { id: 'codex', version: '0.4.1' },
+  }
+  assert.equal(findInstalled([installedRow], staleSnapshotItem), installedRow)
+
+  // The reverse skew is symmetric: a pre-rename installed row (`codex`) matches
+  // a catalog entry advertising the renamed id.
+  const legacyRow = {
+    ...installedRow,
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main#manifest-id=codex',
+  }
+  const renamedItem = {
+    id: 'subagents',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json',
+    manifest: { id: 'subagents' },
+  }
+  assert.equal(findInstalled([legacyRow], renamedItem), legacyRow)
+
+  // Repo-scoped: the same manifest-id string in a different mobius-os repo is a
+  // different app and must never be adopted.
+  const foreignRow = {
+    ...installedRow,
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-other/main#manifest-id=subagents',
+  }
+  assert.equal(findInstalled([foreignRow], renamedItem), null)
+})
+
+test('otherInstalledCatalogItems does not duplicate a curated app under id skew', async () => {
+  const { otherInstalledCatalogItems } = await bundle()
+  // The installed row carries the renamed id and a source_manifest, so it is a
+  // candidate for an "other installed" card. The curated catalog entry still
+  // shows the stale pre-rename snapshot id. It must still be recognized as
+  // represented by the catalog, so no second card is emitted for it.
+  const installed = [{
+    id: 102,
+    slug: 'subagents',
+    name: 'Subagents',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main#manifest-id=subagents',
+    source_manifest: {
+      id: 'subagents',
+      url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json',
+    },
+    version: '0.4.1',
+  }]
+  const catalog = [{
+    id: 'subagents',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-subagents/main/mobius.json',
+    manifest: { id: 'codex', version: '0.4.1' },
+  }]
+
+  assert.deepEqual(otherInstalledCatalogItems(installed, catalog), [])
+})
+
 test('installed catalog apps refresh their live manifest for update detection', async () => {
   const { shouldRefreshCatalogManifest } = await bundle()
   const item = {
