@@ -103,6 +103,36 @@
       "summary": "Give your agent remote tools, with honest costs."
     },
     {
+      "id": "connect",
+      "name": "Connect",
+      "description": "Pair your laptop, workstation, or cluster and let Möbius run things on it.",
+      "repo": "mobius-os/app-connect",
+      "manifest_url": "https://raw.githubusercontent.com/mobius-os/app-connect/main/mobius.json",
+      "raw_base": "https://raw.githubusercontent.com/mobius-os/app-connect/main/",
+      "categories": [
+        "system",
+        "development"
+      ],
+      "keywords": [
+        "connect",
+        "remote machine",
+        "laptop",
+        "workstation",
+        "cluster",
+        "runner",
+        "remote commands",
+        "external computer"
+      ],
+      "capabilities": [
+        "pair external machines securely",
+        "run agent commands on connected computers",
+        "use outbound-only connections with no open ports"
+      ],
+      "audience": "developer",
+      "collection": "developer",
+      "summary": "Bring your computers within reach of Möbius."
+    },
+    {
       "id": "identity",
       "name": "Möbius · You",
       "description": "Your Möbius account, profile and active deployments.",
