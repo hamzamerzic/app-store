@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { STORE_SELF } from '../constants.js'
 import { fetchUpdateCheck, installApp, previewApp } from '../api.js'
+import { capabilityDiffNeedsReview } from '../domain.js'
 import { CapabilityContract } from './CapabilityContract.jsx'
 
 // Self-update banner. The store is bootstrapped separately from its catalog
@@ -28,10 +29,13 @@ export function SelfUpdateBanner({ appId, token }) {
 
   const latest = review?.preview?.manifest
   const hasUpdate = latest && updateCheck?.available === true
+  const accessDiff = review?.preview?.capability_diff
+  const needsAccessReview = capabilityDiffNeedsReview(accessDiff)
+  const previousAccessUnrecorded = accessDiff?.unknown_previous === true
   if (phase !== 'done' && phase !== 'conflict' && !hasUpdate) return null
 
   const onUpdate = async () => {
-    if (!showReview) {
+    if (needsAccessReview && !showReview) {
       setShowReview(true)
       return
     }
@@ -84,12 +88,25 @@ export function SelfUpdateBanner({ appId, token }) {
         <>
           <div className="st-banner-content">
             <div className="st-banner-msg">
-              App Store v{latest.version} is available{phase === 'error' && msg ? ` — ${msg}` : ''}.
+              App Store v{latest.version} is ready{phase === 'error' && msg ? ` — ${msg}` : ''}.
             </div>
-            {showReview && <CapabilityContract review={review} isInstalled />}
+            {showReview && needsAccessReview ? (
+              <div className="st-banner-access-review">
+                <p className="st-banner-access-note">
+                  {previousAccessUnrecorded
+                    ? 'Möbius does not have an earlier access record for this app. Confirm it once; later updates stop only when access changes.'
+                    : 'This update changes what the App Store can access. Review the changes before updating.'}
+                </p>
+                <CapabilityContract review={review} isInstalled />
+              </div>
+            ) : null}
           </div>
           <button className="st-banner-btn" disabled={phase === 'updating'} onClick={onUpdate}>
-            {phase === 'updating' ? 'Updating…' : showReview ? 'Update' : 'Review access'}
+            {phase === 'updating'
+              ? 'Updating…'
+              : needsAccessReview && !showReview
+              ? 'Review access'
+              : 'Update App Store'}
           </button>
         </>
       )}

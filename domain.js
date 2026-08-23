@@ -245,6 +245,7 @@ export function shouldRefreshCatalogManifest(item, installed = []) {
 
 export function busyLabelForAction(actionKind) {
   if (actionKind === 'checking_update') return 'Loading changes…'
+  if (actionKind === 'batch_update') return 'Updating all…'
   if (actionKind === 'update') return 'Updating…'
   if (actionKind === 'resolve') return 'Opening chat…'
   if (actionKind === 'retry') return 'Retrying…'
@@ -259,6 +260,23 @@ export function capabilityDiffNeedsReview(diff) {
   return ['added', 'removed', 'changed'].some(
     (key) => Array.isArray(diff[key]) && diff[key].length > 0,
   )
+}
+
+// Bulk updates may share one confirmation only when the exact source was
+// verified and the app asks for no new or unrecorded access. Anything else
+// stays on the individual review path rather than being silently approved by
+// the batch action.
+export function updateBatchDisposition(prepared) {
+  if (!prepared || prepared.error) return { kind: 'review', reason: 'check_failed' }
+  if (!prepared.preview?.source_digest) return { kind: 'review', reason: 'source_unverified' }
+  const diff = prepared.capabilityReview?.preview?.capability_diff
+  if (diff?.unknown_previous === true) {
+    return { kind: 'review', reason: 'access_unrecorded' }
+  }
+  if (capabilityDiffNeedsReview(diff)) {
+    return { kind: 'review', reason: 'access_changed' }
+  }
+  return { kind: 'ready', reason: null }
 }
 
 export function appLifecycleFor(item, {

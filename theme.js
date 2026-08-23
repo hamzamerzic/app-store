@@ -193,6 +193,7 @@ export const CSS = `
 .st-category-strip {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   overflow: visible;
   padding-bottom: 1px;
@@ -236,6 +237,45 @@ export const CSS = `
   font-size: 11px;
   line-height: 1;
   font-family: var(--mono, monospace);
+}
+.st-update-all-trigger {
+  flex: 0 0 auto;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 7px 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-hover, var(--accent));
+  color: var(--accent-fg);
+  font: 650 13px/1 var(--font);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: filter 150ms, transform 150ms, opacity 150ms;
+}
+.st-update-all-trigger:disabled { opacity: 0.52; cursor: default; }
+.st-update-all-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-fg) 18%, transparent);
+  font: 650 11px/1 var(--mono, monospace);
+}
+@media (hover: hover) {
+  .st-update-all-trigger:not(:disabled):hover { filter: brightness(0.94); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .st-update-all-trigger:not(:disabled):active { transform: scale(0.97); }
+}
+@media (max-width: 520px) {
+  .st-update-all-trigger { margin-left: 0; }
 }
 @media (hover: hover) {
   .st-chip:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
@@ -1021,6 +1061,10 @@ export const CSS = `
   max-width: 560px;
   grid-template-rows: auto auto auto;
 }
+.st-update-all-review {
+  height: auto;
+  max-height: min(720px, calc(100% - 16px));
+}
 .st-update-review-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
 }
@@ -1094,6 +1138,94 @@ export const CSS = `
   cursor: text;
 }
 .st-update-review-error-text { margin-bottom: 6px; color: var(--danger); }
+.st-update-all-intro {
+  padding: 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface2));
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.st-update-all-list {
+  border-block: 1px solid var(--border);
+}
+.st-update-all-item,
+.st-update-all-attention {
+  border-bottom: 1px solid var(--border);
+}
+.st-update-all-item:last-child,
+.st-update-all-attention:last-child { border-bottom: 0; }
+.st-update-all-item > summary {
+  min-height: 56px;
+  padding: 10px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.st-update-all-item > summary::-webkit-details-marker { display: none; }
+.st-update-all-item > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.st-update-all-item-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.st-update-all-item-main strong {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.st-update-all-item-main > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.st-update-all-state {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.st-update-all-state.is-ready { color: var(--green); }
+.st-update-all-files {
+  margin: -2px 0 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 5px;
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--muted);
+  font: 11px/1.45 var(--mono, monospace);
+  overflow-wrap: anywhere;
+}
+.st-update-all-attention {
+  min-height: 64px;
+  padding: 10px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.st-update-all-attention .st-btn { flex: 0 0 auto; min-height: 40px; }
+.st-update-all-progress {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.st-banner-access-review { margin-top: 10px; }
+.st-banner-access-note {
+  max-width: 65ch;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .st-update-review-actions {
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   padding-top: 14px; border-top: 1px solid var(--border);

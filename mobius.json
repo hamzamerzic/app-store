@@ -46,6 +46,7 @@
     "ui/FromUrlTab.jsx",
     "ui/DetailView.jsx",
     "ui/UpdateReviewModal.jsx",
+    "ui/UpdateAllModal.jsx",
     "ui/SelfUpdateBanner.jsx",
     "ui/diff/parseUnifiedDiff.js",
     "ui/diff/DiffView.jsx",

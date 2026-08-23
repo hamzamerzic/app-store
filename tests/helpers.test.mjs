@@ -934,12 +934,48 @@ test('a conflicting apply remains visible as an explicit unchanged result', asyn
 })
 
 test('one-tap updates stop for changed or unknown capabilities', async () => {
-  const { capabilityDiffNeedsReview } = await bundle()
+  const { capabilityDiffNeedsReview, updateBatchDisposition } = await bundle()
   assert.equal(capabilityDiffNeedsReview(null), true)
   assert.equal(capabilityDiffNeedsReview({ unknown_previous: true, added: [], removed: [], changed: [] }), true)
   assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: ['data.manage_apps'], removed: [], changed: [] }), true)
   assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: [], removed: [], changed: ['background.agent'] }), true)
   assert.equal(capabilityDiffNeedsReview({ unknown_previous: false, added: [], removed: [], changed: [] }), false)
+
+  const verified = {
+    preview: { source_digest: 'a'.repeat(64) },
+    capabilityReview: {
+      preview: {
+        capability_diff: { unknown_previous: false, added: [], removed: [], changed: [] },
+      },
+    },
+  }
+  assert.deepEqual(updateBatchDisposition(verified), { kind: 'ready', reason: null })
+  assert.deepEqual(
+    updateBatchDisposition({ ...verified, preview: {} }),
+    { kind: 'review', reason: 'source_unverified' },
+  )
+  assert.deepEqual(
+    updateBatchDisposition({
+      ...verified,
+      capabilityReview: {
+        preview: {
+          capability_diff: { unknown_previous: true, added: [], removed: [], changed: [] },
+        },
+      },
+    }),
+    { kind: 'review', reason: 'access_unrecorded' },
+  )
+  assert.deepEqual(
+    updateBatchDisposition({
+      ...verified,
+      capabilityReview: {
+        preview: {
+          capability_diff: { unknown_previous: false, added: ['data.manage_apps'], removed: [], changed: [] },
+        },
+      },
+    }),
+    { kind: 'review', reason: 'access_changed' },
+  )
 })
 
 test('filterCatalog matches categories, descriptions, and setup metadata', async () => {
@@ -1305,6 +1341,9 @@ test('app details keep stable access information in a bottom disclosure', async 
   const selfUpdateSource = await readFile(join(root, '..', 'ui', 'SelfUpdateBanner.jsx'), 'utf8')
   assert.match(selfUpdateSource, /fetchUpdateCheck\(appId, token\)/)
   assert.doesNotMatch(selfUpdateSource, /semverCmp/)
+  assert.match(selfUpdateSource, /if \(needsAccessReview && !showReview\)/)
+  assert.match(selfUpdateSource, /'Update App Store'/)
+  assert.match(selfUpdateSource, /later updates stop only when access changes/)
 })
 
 test('desktop measure applies to every direct scroll child without a class allowlist', async () => {
@@ -1339,6 +1378,7 @@ test('busy labels stay tied to the action that started', async () => {
   }).actionKind, 'open')
 
   assert.equal(busyLabelForAction('update'), 'Updating…')
+  assert.equal(busyLabelForAction('batch_update'), 'Updating all…')
   assert.equal(busyLabelForAction('open'), 'Opening…')
   assert.equal(busyLabelForAction('checking_update'), 'Loading changes…')
 
@@ -1410,6 +1450,50 @@ test('catalog is a release-independent discovery index with a baked snapshot flo
   assert.match(snapshots, /export const MANIFEST_SNAPSHOTS = \{/)
   assert.doesNotMatch(refresh, /entry\.manifest\s*=/)
   assert.doesNotMatch(refresh, /writeFile\(catalogPath/)
+})
+
+test('catalog publication requires one complete baked snapshot per entry', async () => {
+  const catalog = JSON.parse(await readFile(join(root, '..', 'catalog.json'), 'utf8'))
+  const { MANIFEST_SNAPSHOTS } = await import(
+    pathToFileURL(join(root, '..', 'manifest-snapshots.js'))
+  )
+  const { assertCompleteCatalogSnapshots } = await import(
+    pathToFileURL(join(root, '..', 'scripts', 'catalog-snapshot-contract.mjs'))
+  )
+
+  assert.doesNotThrow(() => assertCompleteCatalogSnapshots(catalog, MANIFEST_SNAPSHOTS))
+
+  const missingVoice = { ...MANIFEST_SNAPSHOTS }
+  delete missingVoice.voice
+  assert.throws(
+    () => assertCompleteCatalogSnapshots(catalog, missingVoice),
+    /voice: snapshot is missing/,
+  )
+
+  assert.throws(
+    () => assertCompleteCatalogSnapshots(catalog, {
+      ...MANIFEST_SNAPSHOTS,
+      voice: { ...MANIFEST_SNAPSHOTS.voice, version: '' },
+    }),
+    /voice: snapshot is missing version/,
+  )
+})
+
+test('app publication requires a complete source_files import tree', async () => {
+  const manifest = JSON.parse(await readFile(join(root, '..', 'mobius.json'), 'utf8'))
+  const { assertCompleteSourceManifest } = await import(
+    pathToFileURL(join(root, '..', 'scripts', 'source-manifest-contract.mjs'))
+  )
+
+  await assert.doesNotReject(() => assertCompleteSourceManifest(join(root, '..'), manifest))
+
+  await assert.rejects(
+    () => assertCompleteSourceManifest(join(root, '..'), {
+      ...manifest,
+      source_files: manifest.source_files.filter((path) => path !== 'ui/UpdateAllModal.jsx'),
+    }),
+    /index\.jsx: relative import \.\/ui\/UpdateAllModal\.jsx is not declared in source_files/,
+  )
 })
 
 test('Beat Machine discovery entry sells beat-making in one short promise', async () => {
