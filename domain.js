@@ -216,9 +216,22 @@ function trustedCatalogRepoBase(urlOrIdentity) {
 }
 
 // Look up an installed App row that corresponds to the catalog entry.
-// Canonical manifest identity is the only source of truth; old platform-owned
-// rows are repaired by the backend install path when the user installs the
-// catalog entry.
+//
+// A trusted mobius-os catalog app is one app per repository (root manifest only
+// — see trustedCatalogRepoBase), so that REPO is the stable app identity. Match
+// on it directly instead of the volatile `#manifest-id=<id>` string. The
+// manifest id skews constantly against the persisted row — a reviewed commit
+// pin, a stale baked snapshot whose live refresh has not landed, or a source
+// RENAME (manifest `previous_id` -> `id`, which the backend already adopts in
+// _select_install_target) — and every one of those skews used to desync the
+// Store's "installed" display and its de-dupe from the backend. Repo identity
+// survives all of them, so a genuinely-installed app is never shown as "Not
+// installed" and never rendered twice.
+//
+// The exact canonical-key hit still comes first so non-mobius-os and
+// subdirectory manifests (which have no trusted repo identity) match precisely,
+// and a null-manifest legacy row — which has no canonical identity at all —
+// still matches nothing.
 export function findInstalled(installed, item) {
   const manifestId = item.source_manifest?.id || item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
@@ -227,12 +240,9 @@ export function findInstalled(installed, item) {
 
   const repoBase = trustedCatalogRepoBase(canonical)
   if (!repoBase) return null
-  const suffix = `#manifest-id=${manifestId}`
-  return installed.find((app) => {
-    const identity = app.manifest_url || ''
-    return identity.endsWith(suffix) &&
-      trustedCatalogRepoBase(identity) === repoBase
-  }) || null
+  return installed.find(
+    (app) => trustedCatalogRepoBase(app.manifest_url || '') === repoBase,
+  ) || null
 }
 
 // A baked manifest gives an uninstalled discovery card a fast, offline-safe
