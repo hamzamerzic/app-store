@@ -15,8 +15,18 @@ export function CatalogFilters({
   resultCount,
   onQueryChange,
   onCategoryChange,
+  updateAllCount = 0,
+  updateAllState = 'idle',
+  updateAllProgress = null,
+  updateAllDisabled = false,
+  onUpdateAll,
 }) {
   const selected = category || 'all'
+  const updateAllLabel = updateAllState === 'checking'
+    ? 'Checking…'
+    : updateAllState === 'updating' && updateAllProgress
+    ? `Updating ${updateAllProgress.current}/${updateAllProgress.total}`
+    : 'Update all'
   return (
     <div className="st-discovery">
       <div className="st-search-row">
@@ -65,6 +75,18 @@ export function CatalogFilters({
             </button>
           )
         })}
+        {updateAllCount > 0 && onUpdateAll ? (
+          <button
+            type="button"
+            className="st-update-all-trigger"
+            onClick={onUpdateAll}
+            disabled={updateAllDisabled || updateAllState !== 'idle'}
+            aria-label={`Update all ${updateAllCount} ${updateAllCount === 1 ? 'app' : 'apps'}`}
+          >
+            <span>{updateAllLabel}</span>
+            {updateAllState === 'idle' ? <span className="st-update-all-count">{updateAllCount}</span> : null}
+          </button>
+        ) : null}
       </div>
     </div>
   )
