@@ -56,6 +56,46 @@ test('canonicalIdentityKey matches backend-style manifest identities', async () 
   )
 })
 
+test('catalog app intents resolve one safe catalog identity', async () => {
+  const { catalogItemIdFromIntent, catalogItemIdFromMessage } = await import(
+    pathToFileURL(join(root, '..', 'domain.js'))
+  )
+
+  assert.equal(catalogItemIdFromIntent('app:voice'), 'voice')
+  assert.equal(catalogItemIdFromIntent('  app:NEWS  '), 'news')
+  assert.equal(catalogItemIdFromIntent('setup'), null)
+  assert.equal(catalogItemIdFromIntent('app:../voice'), null)
+  assert.equal(catalogItemIdFromIntent(null), null)
+
+  const parent = {}
+  const message = {
+    origin: 'https://mobius.test',
+    source: parent,
+    data: { type: 'moebius:app-intent', intent: 'app:voice' },
+  }
+  assert.equal(catalogItemIdFromMessage(message, 'https://mobius.test', parent), 'voice')
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, origin: 'https://attacker.test' },
+    'https://mobius.test',
+    parent,
+  ), null)
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, source: {} },
+    'https://mobius.test',
+    parent,
+  ), null)
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, data: { type: 'unrelated', intent: 'app:voice' } },
+    'https://mobius.test',
+    parent,
+  ), null)
+
+  const source = await readFile(join(root, '..', 'index.jsx'), 'utf8')
+  assert.match(source, /setTab\('browse'\)\s+setCategory\('all'\)/)
+  assert.match(source, /setQuery\(item\.name \|\| intentItemId\)/)
+  assert.match(source, /void openDetail\(item\)/)
+})
+
 test('live catalog metadata preserves baked snapshots and appends new entries', async () => {
   const { mergeCatalogEntries } = await bundle()
   const bakedManifest = { id: 'notes', version: '1.2.3' }
