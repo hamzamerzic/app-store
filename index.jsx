@@ -31,6 +31,7 @@ import {
   mergeCatalogEntries,
   otherInstalledCatalogItems,
   manifestCapabilityRows,
+  resolveCatalogItemIntent,
   sourceBackedInstalledApps,
   shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
@@ -89,6 +90,7 @@ export {
   mergeCatalogEntries,
   otherInstalledCatalogItems,
   manifestCapabilityRows,
+  resolveCatalogItemIntent,
   humanCron,
   isTrustedHost,
   scheduleSummary,
@@ -1399,23 +1401,20 @@ export default function App({ appId, token }) {
 
   useEffect(() => {
     if (!intentItemId || loadingCatalog) return
-    const item = displayCatalog.find(candidate => candidate.id === intentItemId)
+    const resolution = resolveCatalogItemIntent(displayCatalog, intentItemId)
     setIntentItemId(null)
-    if (!item) {
-      setToast({ kind: 'error', message: 'That app is not available in this catalog.' })
+    if (resolution.action === 'unavailable') {
+      setToast(resolution.toast)
       return
     }
     setTab('browse')
     setCategory('all')
-    if (!item.manifest) {
-      setQuery(item.name || intentItemId)
-      setToast({
-        kind: 'info',
-        message: `${item.name || 'That app'} needs a connection before its details can load.`,
-      })
+    if (resolution.action === 'needs-connection') {
+      setQuery(resolution.query)
+      setToast(resolution.toast)
       return
     }
-    void openDetail(item)
+    void openDetail(resolution.item)
   }, [displayCatalog, intentItemId, loadingCatalog, openDetail])
 
   // Detail view replaces the main layout when set.

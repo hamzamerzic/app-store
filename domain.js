@@ -12,6 +12,30 @@ export function catalogItemIdFromMessage(event, expectedOrigin, expectedSource) 
   return catalogItemIdFromIntent(event.data.intent)
 }
 
+export function resolveCatalogItemIntent(catalog, itemId) {
+  const item = Array.isArray(catalog)
+    ? catalog.find(candidate => candidate.id === itemId)
+    : null
+  if (!item) {
+    return {
+      action: 'unavailable',
+      toast: { kind: 'error', message: 'That app is not available in this catalog.' },
+    }
+  }
+  if (!item.manifest) {
+    return {
+      action: 'needs-connection',
+      item,
+      query: item.name || itemId,
+      toast: {
+        kind: 'info',
+        message: `${item.name || 'That app'} needs a connection before its details can load.`,
+      },
+    }
+  }
+  return { action: 'open', item }
+}
+
 // A blocked apply replaces the review modal's primary action. Move focus to
 // the new action after React commits that result so keyboard users do not fall
 // through to <body>. The dialog is a safe fallback if the action is absent.
