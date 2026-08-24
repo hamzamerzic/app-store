@@ -56,6 +56,64 @@ test('canonicalIdentityKey matches backend-style manifest identities', async () 
   )
 })
 
+test('catalog app intents resolve one safe catalog identity and action', async () => {
+  const {
+    catalogItemIdFromIntent,
+    catalogItemIdFromMessage,
+    resolveCatalogItemIntent,
+  } = await import(
+    pathToFileURL(join(root, '..', 'domain.js'))
+  )
+
+  assert.equal(catalogItemIdFromIntent('app:voice'), 'voice')
+  assert.equal(catalogItemIdFromIntent('  app:NEWS  '), 'news')
+  assert.equal(catalogItemIdFromIntent('setup'), null)
+  assert.equal(catalogItemIdFromIntent('app:../voice'), null)
+  assert.equal(catalogItemIdFromIntent(null), null)
+
+  const parent = {}
+  const message = {
+    origin: 'https://mobius.test',
+    source: parent,
+    data: { type: 'moebius:app-intent', intent: 'app:voice' },
+  }
+  assert.equal(catalogItemIdFromMessage(message, 'https://mobius.test', parent), 'voice')
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, origin: 'https://attacker.test' },
+    'https://mobius.test',
+    parent,
+  ), null)
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, source: {} },
+    'https://mobius.test',
+    parent,
+  ), null)
+  assert.equal(catalogItemIdFromMessage(
+    { ...message, data: { type: 'unrelated', intent: 'app:voice' } },
+    'https://mobius.test',
+    parent,
+  ), null)
+
+  const voice = { id: 'voice', name: 'Voice', manifest: { id: 'voice' } }
+  assert.deepEqual(resolveCatalogItemIntent([voice], 'voice'), {
+    action: 'open',
+    item: voice,
+  })
+  assert.deepEqual(resolveCatalogItemIntent([{ id: 'maps', name: 'Maps' }], 'maps'), {
+    action: 'needs-connection',
+    item: { id: 'maps', name: 'Maps' },
+    query: 'Maps',
+    toast: {
+      kind: 'info',
+      message: 'Maps needs a connection before its details can load.',
+    },
+  })
+  assert.deepEqual(resolveCatalogItemIntent([], 'missing'), {
+    action: 'unavailable',
+    toast: { kind: 'error', message: 'That app is not available in this catalog.' },
+  })
+})
+
 test('live catalog metadata preserves baked snapshots and appends new entries', async () => {
   const { mergeCatalogEntries } = await bundle()
   const bakedManifest = { id: 'notes', version: '1.2.3' }
@@ -362,6 +420,26 @@ test('findInstalled ignores legacy platform rows without canonical identity', as
     manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
     manifest: { id: 'notes' },
   }), null)
+})
+
+test('findInstalled rejects a catalog item without canonical source identity', async () => {
+  const { findInstalled } = await bundle()
+  const installed = [{
+    id: 11,
+    slug: 'notes',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main#manifest-id=notes',
+  }]
+
+  assert.equal(findInstalled(installed, {
+    id: '',
+    manifest_url: null,
+    manifest: null,
+  }), null)
+  assert.equal(findInstalled(installed, {
+    id: 'notes',
+    manifest_url: 'https://raw.githubusercontent.com/mobius-os/app-notes/main/mobius.json',
+    manifest: { id: 'notes' },
+  }), installed[0])
 })
 
 test('validateManifestUrl only accepts http(s) manifest URLs', async () => {

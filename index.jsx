@@ -20,6 +20,7 @@ import {
   buildUpdateReviewMessage,
   appLifecycleFor,
   busyLabelForAction,
+  catalogItemIdFromMessage,
   capabilityDiffNeedsReview,
   clearResolvedBlockedReview,
   clearSettledBlockedReview,
@@ -30,6 +31,7 @@ import {
   mergeCatalogEntries,
   otherInstalledCatalogItems,
   manifestCapabilityRows,
+  resolveCatalogItemIntent,
   sourceBackedInstalledApps,
   shouldRefreshCatalogManifest,
   sortCatalogForDisplay,
@@ -70,6 +72,8 @@ import { UpdateAllModal } from './ui/UpdateAllModal.jsx'
 export {
   appLifecycleFor,
   busyLabelForAction,
+  catalogItemIdFromIntent,
+  catalogItemIdFromMessage,
   capabilityDiffNeedsReview,
   canonicalIdentityKey,
   clearResolvedBlockedReview,
@@ -86,6 +90,7 @@ export {
   mergeCatalogEntries,
   otherInstalledCatalogItems,
   manifestCapabilityRows,
+  resolveCatalogItemIntent,
   humanCron,
   isTrustedHost,
   scheduleSummary,
@@ -271,6 +276,7 @@ export default function App({ appId, token }) {
   const [systemSetupComplete, setSystemSetupComplete] = useState(() => readSystemSetupReady())
   const [providerStatus, setProviderStatus] = useState(null)
   const [detail, setDetail] = useState(null)  // {id, manifest, raw_base}
+  const [intentItemId, setIntentItemId] = useState(null)
   const [capabilityReviews, setCapabilityReviews] = useState({})
   const navDetailRef = useRef(null)  // pending detail item during nav-push ack
   // B1: preserve the catalog grid's scroll across opening a detail and coming
@@ -332,6 +338,19 @@ export default function App({ appId, token }) {
   // window elapses; the mount effect re-stamps once catalog hydration lands.
   const lastUpdateCheckRef = useRef(Date.now())
   const updateCheckingRef = useRef(false)
+
+  useEffect(() => {
+    function onIntent(event) {
+      const itemId = catalogItemIdFromMessage(
+        event,
+        window.location.origin,
+        window.parent,
+      )
+      if (itemId) setIntentItemId(itemId)
+    }
+    window.addEventListener('message', onIntent)
+    return () => window.removeEventListener('message', onIntent)
+  }, [])
 
   const clearSettledUpdateArtifacts = useCallback((itemIds) => {
     if (!itemIds?.size) return
@@ -1379,6 +1398,24 @@ export default function App({ appId, token }) {
     }
     return matches
   }, [displayCatalog, query, category, lifecycleById])
+
+  useEffect(() => {
+    if (!intentItemId || loadingCatalog) return
+    const resolution = resolveCatalogItemIntent(displayCatalog, intentItemId)
+    setIntentItemId(null)
+    if (resolution.action === 'unavailable') {
+      setToast(resolution.toast)
+      return
+    }
+    setTab('browse')
+    setCategory('all')
+    if (resolution.action === 'needs-connection') {
+      setQuery(resolution.query)
+      setToast(resolution.toast)
+      return
+    }
+    void openDetail(resolution.item)
+  }, [displayCatalog, intentItemId, loadingCatalog, openDetail])
 
   // Detail view replaces the main layout when set.
   if (detail) {
