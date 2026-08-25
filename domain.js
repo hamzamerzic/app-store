@@ -1,5 +1,41 @@
 import { PERM_EXPLAIN, TRUSTED_HOSTS } from './constants.js'
 
+export function catalogItemIdFromIntent(intent) {
+  if (typeof intent !== 'string') return null
+  const match = /^app:([a-z0-9][a-z0-9-]*)$/i.exec(intent.trim())
+  return match ? match[1].toLowerCase() : null
+}
+
+export function catalogItemIdFromMessage(event, expectedOrigin, expectedSource) {
+  if (event?.origin !== expectedOrigin || event?.source !== expectedSource) return null
+  if (event?.data?.type !== 'moebius:app-intent') return null
+  return catalogItemIdFromIntent(event.data.intent)
+}
+
+export function resolveCatalogItemIntent(catalog, itemId) {
+  const item = Array.isArray(catalog)
+    ? catalog.find(candidate => candidate.id === itemId)
+    : null
+  if (!item) {
+    return {
+      action: 'unavailable',
+      toast: { kind: 'error', message: 'That app is not available in this catalog.' },
+    }
+  }
+  if (!item.manifest) {
+    return {
+      action: 'needs-connection',
+      item,
+      query: item.name || itemId,
+      toast: {
+        kind: 'info',
+        message: `${item.name || 'That app'} needs a connection before its details can load.`,
+      },
+    }
+  }
+  return { action: 'open', item }
+}
+
 // A blocked apply replaces the review modal's primary action. Move focus to
 // the new action after React commits that result so keyboard users do not fall
 // through to <body>. The dialog is a safe fallback if the action is absent.
@@ -235,6 +271,7 @@ function trustedCatalogRepoBase(urlOrIdentity) {
 export function findInstalled(installed, item) {
   const manifestId = item.source_manifest?.id || item.manifest?.id || item.id
   const canonical = canonicalIdentityKey(item.manifest_url, manifestId)
+  if (!canonical) return null
   const exact = installed.find(a => a.manifest_url === canonical)
   if (exact) return exact
 
