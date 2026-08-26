@@ -1506,7 +1506,7 @@ export const CSS = `
 
 /* mobius-ui:CenteredRail v1 */
 @media (min-width: 900px) {
-  .st-header { width: min(100%, 840px); margin-inline: auto; }
+  .st-header { width: min(100%, 760px); margin-inline: auto; }
 }
 /* /mobius-ui:CenteredRail */
 `
